@@ -79,142 +79,112 @@ class LLMService:
             }
 
     def build_messages(
-        self,
-        user_text: str,
-        context: dict,
-        intent: str,
-        analytics_result: dict | None = None,
-        fact_summary: dict | None = None
+            self,
+            user_text: str,
+            context: dict,
+            intent: str,
+            analytics_result: dict | None = None,
+            fact_summary: dict | None = None
     ) -> list[dict]:
-        system_prompt = """
-Ты — интеллектуальный ассистент для работников брокерской сферы.
+        system_parts = [
+            """
+    Ты — интеллектуальный ассистент для работников брокерской сферы.
 
-Пользователь общается с тобой через единый чат.
-Ты должен учитывать:
-- историю диалога,
-- портфель клиента,
-- агрегированные метрики портфеля,
-- рыночные данные,
-- новости,
-- результаты аналитики,
-- агрегированные факты по инструменту и позиции.
+    Пользователь общается с тобой через единый чат.
+    Ты должен учитывать:
+    - историю диалога,
+    - портфель клиента,
+    - агрегированные метрики портфеля,
+    - рыночные данные,
+    - новости,
+    - результаты аналитики,
+    - агрегированные факты по инструменту и позиции.
 
-Правила:
-1. Отвечай строго на русском языке.
-2. Не выдумывай факты, цены, новости и показатели.
-3. Если данных недостаточно — прямо скажи об этом.
-4. Не давай индивидуальных инвестиционных рекомендаций.
-5. Если пользователь спрашивает про портфель — используй агрегированные метрики портфеля.
-6. Если пользователь спрашивает про конкретную бумагу — используй цену, новости и данные позиции.
-7. Если есть текущий P&L по позиции или портфелю — можешь его описать.
-8. Если пользователь просит технический анализ — используй только доступные индикаторы и не обещай рост или падение как факт.
-9. Отвечай кратко, профессионально, содержательно.
-"""
-
-        messages = [{"role": "system", "content": system_prompt.strip()}]
+    Правила:
+    1. Отвечай строго на русском языке.
+    2. Не выдумывай факты, цены, новости и показатели.
+    3. Если данных недостаточно — прямо скажи об этом.
+    4. Не давай индивидуальных инвестиционных рекомендаций.
+    5. Если пользователь спрашивает про портфель — используй агрегированные метрики портфеля.
+    6. Если пользователь спрашивает про конкретную бумагу — используй цену, новости и данные позиции.
+    7. Если есть текущий P&L по позиции или портфелю — можешь его описать.
+    8. Если пользователь просит технический анализ — используй только доступные индикаторы и не обещай рост или падение как факт.
+    9. Отвечай с разъяснениями(как пятилетнему ребёнку), профессионально, содержательно.
+    """.strip()
+        ]
 
         portfolio = context.get("portfolio", [])
         if portfolio:
-            messages.append({
-                "role": "system",
-                "content": f"Портфель клиента: {portfolio}"
-            })
+            system_parts.append(f"Портфель клиента: {portfolio}")
 
         portfolio_metrics = context.get("portfolio_metrics")
         if portfolio_metrics:
-            messages.append({
-                "role": "system",
-                "content": f"Метрики портфеля: {portfolio_metrics}"
-            })
+            system_parts.append(f"Метрики портфеля: {portfolio_metrics}")
 
         portfolio_text_summary = context.get("portfolio_text_summary")
         if portfolio_text_summary:
-            messages.append({
-                "role": "system",
-                "content": f"Краткое summary портфеля: {portfolio_text_summary}"
-            })
+            system_parts.append(f"Краткое summary портфеля: {portfolio_text_summary}")
 
         market_context = context.get("market_context")
         if market_context:
-            messages.append({
-                "role": "system",
-                "content": f"Рыночный контекст: {market_context}"
-            })
+            system_parts.append(f"Рыночный контекст: {market_context}")
 
         multi_market_context = context.get("multi_market_context")
         if multi_market_context:
-            messages.append({
-                "role": "system",
-                "content": f"Множественный рыночный контекст: {multi_market_context}"
-            })
+            system_parts.append(f"Множественный рыночный контекст: {multi_market_context}")
 
         news_context = context.get("news_context")
         if news_context:
-            messages.append({
-                "role": "system",
-                "content": f"Новостной контекст: {news_context}"
-            })
+            system_parts.append(f"Новостной контекст: {news_context}")
 
         multi_news_context = context.get("multi_news_context")
         if multi_news_context:
-            messages.append({
-                "role": "system",
-                "content": f"Множественный новостной контекст: {multi_news_context}"
-            })
+            system_parts.append(f"Множественный новостной контекст: {multi_news_context}")
 
         position_context = context.get("position_context")
         if position_context:
-            messages.append({
-                "role": "system",
-                "content": f"Контекст позиции пользователя: {position_context}"
-            })
+            system_parts.append(f"Контекст позиции пользователя: {position_context}")
 
         position_market_metrics = context.get("position_market_metrics")
         if position_market_metrics:
-            messages.append({
-                "role": "system",
-                "content": f"Метрики позиции: {position_market_metrics}"
-            })
+            system_parts.append(f"Метрики позиции: {position_market_metrics}")
 
         multi_position_contexts = context.get("multi_position_contexts")
         if multi_position_contexts:
-            messages.append({
-                "role": "system",
-                "content": f"Контексты нескольких позиций: {multi_position_contexts}"
-            })
+            system_parts.append(f"Контексты нескольких позиций: {multi_position_contexts}")
 
         multi_position_market_metrics = context.get("multi_position_market_metrics")
         if multi_position_market_metrics:
-            messages.append({
-                "role": "system",
-                "content": f"Метрики нескольких позиций: {multi_position_market_metrics}"
-            })
+            system_parts.append(f"Метрики нескольких позиций: {multi_position_market_metrics}")
 
         resolved_instrument = context.get("resolved_instrument")
         if resolved_instrument:
-            messages.append({
-                "role": "system",
-                "content": f"Распознанный инструмент: {resolved_instrument}"
-            })
+            system_parts.append(f"Распознанный инструмент: {resolved_instrument}")
 
         if fact_summary:
-            messages.append({
-                "role": "system",
-                "content": f"Агрегированные факты: {fact_summary}"
-            })
+            system_parts.append(f"Агрегированные факты: {fact_summary}")
 
-        messages.extend(context.get("chat_history", []))
-
-        messages.append({
-            "role": "system",
-            "content": f"Определённый intent: {intent}"
-        })
+        system_parts.append(f"Определённый intent: {intent}")
 
         if analytics_result:
-            messages.append({
+            system_parts.append(f"Результат аналитики: {analytics_result}")
+
+        messages = [
+            {
                 "role": "system",
-                "content": f"Результат аналитики: {analytics_result}"
-            })
+                "content": "\n\n".join(system_parts)
+            }
+        ]
+
+        chat_history = context.get("chat_history", [])
+        for msg in chat_history:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role in {"user", "assistant"} and content:
+                messages.append({
+                    "role": role,
+                    "content": content
+                })
 
         messages.append({
             "role": "user",

@@ -135,3 +135,12 @@ class ContextService:
         ]
 
         return any(marker in text for marker in refresh_markers)
+
+    def get_news_context(self, ticker: str):
+        news = self.news_service.get_news_by_ticker(ticker)
+
+        return {
+            "ticker": ticker,
+            "news_count": len(news),
+            "items": news[:5]
+        }
