@@ -4,6 +4,11 @@ from backend.models import Chat, User
 from backend.services.portfolio_service import PortfolioService
 from backend.services.market_service import MarketService
 from backend.services.news_service import NewsService
+from backend.services.corporate_actions_service import CorporateActionsService
+from backend.services.price_history_service import PriceHistoryService
+from backend.services.technical_analysis_service import TechnicalAnalysisService
+from backend.services.recommendation_service import RecommendationService
+from backend.services.instrument_comparison_service import InstrumentComparisonService
 
 
 class ContextService:
@@ -11,6 +16,11 @@ class ContextService:
         self.portfolio_service = PortfolioService()
         self.market_service = MarketService()
         self.news_service = NewsService()
+        self.corporate_actions_service = CorporateActionsService()
+        self.price_history_service = PriceHistoryService()
+        self.technical_analysis_service = TechnicalAnalysisService()
+        self.recommendation_service = RecommendationService()
+        self.instrument_comparison_service = InstrumentComparisonService()
 
     def build_context(
         self,
@@ -25,10 +35,11 @@ class ContextService:
 
         chat_history = []
         for message in messages:
-            chat_history.append({
-                "role": message.role,
-                "content": message.content
-            })
+            if message.role in {"user", "assistant"}:
+                chat_history.append({
+                    "role": message.role,
+                    "content": message.content
+                })
 
         should_refresh_portfolio = self._should_refresh_portfolio_prices(user_text)
 
@@ -96,6 +107,143 @@ class ContextService:
             if multi_position_market_metrics:
                 position_market_metrics = multi_position_market_metrics[0]
 
+        technical_analysis_context = None
+        dividend_context = None
+        dividend_text_summary = None
+        buy_or_wait_context = None
+        entry_point_context = None
+        dividend_comment_context = None
+
+        multi_technical_analysis_contexts = []
+        multi_dividend_contexts = []
+        multi_entry_point_contexts = []
+        multi_buy_or_wait_contexts = []
+        multi_comparison_items = []
+        comparison_context = None
+
+        # Одиночный контекст
+        if market_context and market_context.get("ticker") and market_context.get("price_found"):
+            ticker = market_context["ticker"]
+            current_price = market_context.get("price")
+
+            try:
+                candles = self.price_history_service.get_candles(
+                    ticker=ticker,
+                    interval="24",
+                    limit=60
+                )
+                if candles:
+                    technical_analysis_context = self.technical_analysis_service.analyze(candles)
+            except Exception:
+                technical_analysis_context = None
+
+            dividend_context = self.corporate_actions_service.get_dividend_context(
+                ticker=ticker,
+                current_price=current_price
+            )
+            dividend_text_summary = self.corporate_actions_service.build_dividend_text_summary(
+                dividend_context
+            )
+
+            buy_or_wait_context = self.recommendation_service.build_buy_or_wait_context(
+                market_context=market_context,
+                technical_analysis=technical_analysis_context,
+                dividend_context=dividend_context,
+                position_market_metrics=position_market_metrics
+            )
+
+            entry_point_context = self.recommendation_service.build_entry_point_context(
+                market_context=market_context,
+                technical_analysis=technical_analysis_context
+            )
+
+            dividend_comment_context = self.recommendation_service.build_dividend_comment(
+                dividend_context=dividend_context
+            )
+
+        # Множественный контекст для сравнений
+        for idx, market_item in enumerate(multi_market_context):
+            if not market_item.get("price_found"):
+                continue
+
+            ticker = market_item.get("ticker")
+            current_price = market_item.get("price")
+
+            ta_ctx = None
+            try:
+                candles = self.price_history_service.get_candles(
+                    ticker=ticker,
+                    interval="24",
+                    limit=60
+                )
+                if candles:
+                    ta_ctx = self.technical_analysis_service.analyze(candles)
+            except Exception:
+                ta_ctx = None
+
+            dividend_ctx = self.corporate_actions_service.get_dividend_context(
+                ticker=ticker,
+                current_price=current_price
+            )
+
+            related_position_metrics = None
+            for pos_metrics in multi_position_market_metrics:
+                if pos_metrics.get("ticker") == ticker:
+                    related_position_metrics = pos_metrics
+                    break
+
+            entry_ctx = self.recommendation_service.build_entry_point_context(
+                market_context=market_item,
+                technical_analysis=ta_ctx
+            )
+
+            buy_wait_ctx = self.recommendation_service.build_buy_or_wait_context(
+                market_context=market_item,
+                technical_analysis=ta_ctx,
+                dividend_context=dividend_ctx,
+                position_market_metrics=related_position_metrics
+            )
+
+            multi_technical_analysis_contexts.append({
+                "ticker": ticker,
+                "display_name": market_item.get("display_name"),
+                "analysis": ta_ctx
+            })
+
+            multi_dividend_contexts.append({
+                "ticker": ticker,
+                "display_name": market_item.get("display_name"),
+                "dividend": dividend_ctx
+            })
+
+            multi_entry_point_contexts.append({
+                "ticker": ticker,
+                "display_name": market_item.get("display_name"),
+                "entry_point": entry_ctx
+            })
+
+            multi_buy_or_wait_contexts.append({
+                "ticker": ticker,
+                "display_name": market_item.get("display_name"),
+                "buy_or_wait": buy_wait_ctx
+            })
+
+            multi_comparison_items.append({
+                "ticker": ticker,
+                "display_name": market_item.get("display_name"),
+                "market_context": market_item,
+                "technical_analysis_context": ta_ctx,
+                "dividend_context": dividend_ctx,
+                "position_market_metrics": related_position_metrics,
+                "entry_point_context": entry_ctx,
+                "buy_or_wait_context": buy_wait_ctx,
+            })
+
+        if len(multi_comparison_items) >= 2:
+            comparison_context = self.instrument_comparison_service.build_comparison(
+                multi_comparison_items
+            )
+
         return {
             "chat": {
                 "id": chat.id,
@@ -114,7 +262,18 @@ class ContextService:
             "position_context": position_context,
             "position_market_metrics": position_market_metrics,
             "multi_position_contexts": multi_position_contexts,
-            "multi_position_market_metrics": multi_position_market_metrics
+            "multi_position_market_metrics": multi_position_market_metrics,
+            "technical_analysis_context": technical_analysis_context,
+            "dividend_context": dividend_context,
+            "dividend_text_summary": dividend_text_summary,
+            "buy_or_wait_context": buy_or_wait_context,
+            "entry_point_context": entry_point_context,
+            "dividend_comment_context": dividend_comment_context,
+            "multi_technical_analysis_contexts": multi_technical_analysis_contexts,
+            "multi_dividend_contexts": multi_dividend_contexts,
+            "multi_entry_point_contexts": multi_entry_point_contexts,
+            "multi_buy_or_wait_contexts": multi_buy_or_wait_contexts,
+            "comparison_context": comparison_context
         }
 
     def _should_refresh_portfolio_prices(self, user_text: str) -> bool:
@@ -132,15 +291,11 @@ class ContextService:
             "сравни",
             "анализ",
             "проанализиру",
+            "стоит ли покупать",
+            "покупать или подождать",
+            "точка входа",
+            "дивиденд",
+            "что лучше",
         ]
 
         return any(marker in text for marker in refresh_markers)
-
-    def get_news_context(self, ticker: str):
-        news = self.news_service.get_news_by_ticker(ticker)
-
-        return {
-            "ticker": ticker,
-            "news_count": len(news),
-            "items": news[:5]
-        }

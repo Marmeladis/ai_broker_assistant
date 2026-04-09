@@ -416,7 +416,7 @@ def build_asset_summary(
 # Auth page
 # =========================
 def render_auth():
-    st.title("📈 Broker Assistant")
+    st.title("Broker Assistant")
     st.subheader("Единый диалоговый ассистент для брокерской сферы")
 
     mode = st.radio(
@@ -585,7 +585,7 @@ def render_right_panel():
 # =========================
 def render_dialog_page():
     st.markdown('<div class="sticky-header">', unsafe_allow_html=True)
-    st.title("💬 Диалог с ассистентом")
+    st.title("Диалог с ассистентом")
     st.caption("Единая точка входа: ассистент сам использует портфель, рынок, новости и аналитику.")
 
     if st.session_state.last_resolved_instrument:
@@ -639,7 +639,7 @@ def render_dialog_page():
 # =========================
 def render_asset_analytics_screen():
     st.markdown('<div class="sticky-header">', unsafe_allow_html=True)
-    st.markdown("## 📊 Аналитический экран по бумаге")
+    st.markdown("## Аналитический экран по бумаге")
     st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("### Выбор инструмента")
@@ -679,7 +679,7 @@ def render_asset_analytics_screen():
         search_query = st.text_input(
             "Название бумаги или тикер",
             value=st.session_state.get("chart_search_query", ""),
-            placeholder="Например: Сбербанк, Газпром, Лукойл, SBER",
+            placeholder="Например: Сбербанк, Газпром, Лукойл, Роснефть",
             key="asset_search_query"
         )
 
@@ -849,12 +849,12 @@ def render_asset_analytics_screen():
             else:
                 st.metric("P&L", "—")
     else:
-        st.caption("Этой бумаги сейчас нет в твоём портфеле.")
+        st.caption("Этой бумаги сейчас нет в вашем портфеле.")
 
     info_col1, info_col2 = st.columns([2, 1])
 
     with info_col1:
-        st.markdown("### 🧠 Краткий AI-вывод")
+        st.markdown("### Краткий вывод")
         ai_summary = build_asset_summary(
             ticker=ticker,
             display_name=display_name,
@@ -897,14 +897,14 @@ def render_asset_analytics_screen():
                     show_api_error(response)
 
     with info_col2:
-        st.markdown("### 📌 Техпоказатели")
+        st.markdown("### Технические показатели")
         st.write(f"**Паттерн:** {analysis.get('pattern') or '—'}")
         st.write(f"**MACD:** {round(analysis.get('macd'), 4) if analysis.get('macd') is not None else '—'}")
         st.write(f"**MACD signal:** {round(analysis.get('macd_signal'), 4) if analysis.get('macd_signal') is not None else '—'}")
         st.write(f"**Поддержка:** {round(analysis.get('support'), 4) if analysis.get('support') is not None else '—'}")
         st.write(f"**Сопротивление:** {round(analysis.get('resistance'), 4) if analysis.get('resistance') is not None else '—'}")
 
-    st.markdown("### 📰 Новости")
+    st.markdown("### Новости")
     if not news_data:
         st.info("Не удалось загрузить новости.")
     else:
@@ -955,7 +955,7 @@ def main():
 
     render_sidebar()
 
-    tab1, tab2 = st.tabs(["💬 Диалог", "📊 Аналитический экран"])
+    tab1, tab2 = st.tabs([" Диалог", "Аналитический экран"])
 
     with tab1:
         left_col, right_col = st.columns([3, 1])

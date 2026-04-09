@@ -11,6 +11,7 @@ from backend.services.response_builder_service import ResponseBuilderService
 from backend.services.comparative_response_service import ComparativeResponseService
 from backend.services.smart_answer_service import SmartAnswerService
 from backend.services.query_preprocessor_service import QueryPreprocessorService
+from backend.services.session_context_service import SessionContextService
 
 
 class ChatService:
@@ -25,6 +26,7 @@ class ChatService:
         self.comparative_response_service = ComparativeResponseService()
         self.smart_answer_service = SmartAnswerService()
         self.query_preprocessor_service = QueryPreprocessorService()
+        self.session_context_service = SessionContextService()
 
     def get_user_chat(self, db: Session, user_id: int) -> Chat | None:
         return db.query(Chat).filter(Chat.user_id == user_id).first()
@@ -57,20 +59,40 @@ class ChatService:
 
         db.refresh(chat)
 
+        session_enrichment = self.session_context_service.enrich_user_text(
+            db=db,
+            chat_id=chat.id,
+            user_text=user_text
+        )
+        enriched_text = session_enrichment["enriched_text"]
+
         preprocess_result = self.query_preprocessor_service.preprocess(
             db=db,
             user=user,
-            user_text=user_text
+            user_text=enriched_text
         )
 
         normalized_text = preprocess_result["normalized_text"]
         resolved_instrument = preprocess_result["resolved_instrument"]
+
+        if not resolved_instrument:
+            session_context = session_enrichment.get("session_context", {})
+            session_instrument = session_context.get("last_resolved_instrument")
+            if session_enrichment.get("used_session_context") and session_instrument:
+                resolved_instrument = session_instrument
 
         resolved_tickers = self.context_service.market_service.extract_tickers_from_text(
             db=db,
             text=normalized_text,
             resolved_instrument=resolved_instrument
         )
+
+        session_context = self.session_context_service.get_context(db, chat.id)
+        last_ticker = session_context.get("last_ticker")
+
+        if "сравни" in normalized_text.lower() and last_ticker:
+            if last_ticker not in resolved_tickers:
+                resolved_tickers = [last_ticker] + resolved_tickers
 
         intent = self.intent_service.detect_intent(
             text=normalized_text,
@@ -84,6 +106,9 @@ class ChatService:
             user_text=normalized_text,
             resolved_instrument=resolved_instrument
         )
+
+        context["session_context"] = session_context
+        context["used_session_context"] = session_enrichment.get("used_session_context", False)
 
         analytics_result = self.analytics_service.run(
             user_text=normalized_text,
@@ -152,6 +177,13 @@ class ChatService:
             analytics_result=analytics_result
         )
 
+        updated_session_context = self.session_context_service.update_context(
+            db=db,
+            chat_id=chat.id,
+            resolved_instrument=resolved_instrument,
+            intent=intent
+        )
+
         return {
             "user_message": user_message,
             "assistant_message": assistant_message,
@@ -161,5 +193,7 @@ class ChatService:
             "comparative_summary": comparative_summary,
             "fact_summary": fact_summary,
             "history_id": history_entry.id if history_entry else None,
-            "analytical_report_id": analytical_report.id if analytical_report else None
+            "analytical_report_id": analytical_report.id if analytical_report else None,
+            "session_context": updated_session_context,
+            "used_session_context": session_enrichment.get("used_session_context", False)
         }

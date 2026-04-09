@@ -1,5 +1,12 @@
 from datetime import datetime
 import uuid
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from backend.database import Base
+
+
 
 from sqlalchemy import (
     Column, String, DateTime, ForeignKey, Boolean,
@@ -195,3 +202,19 @@ class InstrumentAlias(Base):
     ticker = Column(String, ForeignKey("financial_instruments.ticker"), nullable=False, index=True)
     alias = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+class ChatSessionState(Base):
+    __tablename__ = "chat_session_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("chats.id"), unique=True, nullable=False, index=True)
+
+    last_ticker = Column(String, nullable=True)
+    recent_tickers_json = Column(Text, nullable=True)
+    last_intent = Column(String, nullable=True)
+    last_resolved_instrument_json = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    chat = relationship("Chat", backref="session_state")

@@ -1,10 +1,55 @@
 class IntentService:
-    def detect_intent(self, text: str, resolved_tickers: list[str] | None = None) -> str:
-        text_lower = text.lower().strip().replace("ё", "е")
+    def detect_intent(
+        self,
+        text: str,
+        resolved_tickers: list[str] | None = None
+    ) -> str:
+        text_lower = (text or "").lower().replace("ё", "е").strip()
         resolved_tickers = resolved_tickers or []
-        is_multi = len(resolved_tickers) >= 2
 
-        # technical analysis
+        # ---- dividends ----
+        if any(marker in text_lower for marker in [
+            "дивиденд",
+            "дивиденды",
+            "дивидендная доходность",
+            "когда отсечка",
+            "дата отсечки",
+            "реестр",
+            "закрытие реестра",
+            "когда будут дивиденды",
+            "какие дивиденды",
+            "выплата дивидендов",
+        ]):
+            return "dividend_info"
+
+        # ---- buy / wait / entry point ----
+        if any(marker in text_lower for marker in [
+            "стоит ли покупать",
+            "покупать или подождать",
+            "покупать сейчас или подождать",
+            "стоит ли входить",
+            "есть ли смысл покупать",
+            "входить сейчас",
+            "хороший ли сейчас вход",
+            "точка входа",
+            "когда лучше купить",
+            "лучше купить сейчас",
+            "пора ли покупать",
+            "покупать эту бумагу",
+        ]):
+            return "buy_or_wait"
+
+        if any(marker in text_lower for marker in [
+            "точка входа",
+            "вход по бумаге",
+            "где лучше входить",
+            "какой уровень входа",
+            "на каком уровне покупать",
+            "где вход",
+        ]):
+            return "entry_point_analysis"
+
+        # ---- technical analysis ----
         if any(marker in text_lower for marker in [
             "теханализ",
             "технический анализ",
@@ -22,127 +67,112 @@ class IntentService:
             "торговый сигнал",
             "скользящ",
             "sma",
+            "macd",
+            "rsi",
         ]):
             return "technical_analysis"
 
-        # multi-comparison intents
-        if is_multi:
-            if any(marker in text_lower for marker in [
-                "новост",
-                "объясни новост",
-                "какие новости",
-                "сравни новости",
-            ]):
-                return "multi_news_compare"
+        # ---- multi compare intents ----
+        compare_markers = [
+            "сравни",
+            "сравнение",
+            "что лучше",
+            "чем отличается",
+            "лучше чем",
+            "или",
+            "vs",
+        ]
 
+        if len(resolved_tickers) >= 2 or any(marker in text_lower for marker in compare_markers):
             if any(marker in text_lower for marker in [
-                "цен",
-                "котиров",
-                "курс",
+                "цена",
+                "котировка",
                 "сколько стоит",
-                "сравни цену",
-                "сравни котировки",
             ]):
                 return "multi_price_compare"
 
             if any(marker in text_lower for marker in [
-                "позиц",
-                "что с моими пози",
-                "что с моей пози",
+                "новости",
+                "новостной фон",
+            ]):
+                return "multi_news_compare"
+
+            if any(marker in text_lower for marker in [
+                "позиции",
+                "мои позиции",
                 "мой результат",
-                "мои бумаги",
-                "по моим бумагам",
+                "мой портфель",
                 "в плюсе",
                 "в минусе",
-                "результат",
-                "pnl",
             ]):
                 return "multi_position_compare"
 
-            if any(marker in text_lower for marker in [
-                "сравни",
-                "сравнение",
-                "что лучше",
-                "лучше выглядит",
-                "какой лучше",
-                "какая бумага лучше",
-            ]):
-                return "multi_instrument_compare"
+            return "multi_instrument_compare"
 
-        # generic comparison
+        # ---- portfolio analysis ----
         if any(marker in text_lower for marker in [
-            "сравни",
-            "сравнение",
-            "бенчмарк",
-            "индекс",
-            "что лучше",
-            "лучше выглядит",
-        ]):
-            return "benchmark_compare"
-
-        # price
-        if any(marker in text_lower for marker in [
-            "цена",
-            "котиров",
-            "сколько стоит",
-            "курс",
-            "текущая цена",
-        ]):
-            return "price_check"
-
-        # news
-        if any(marker in text_lower for marker in [
-            "новост",
-            "объясни новост",
-            "что значит новост",
-            "влияние новост",
-        ]):
-            return "news_explain"
-
-        # portfolio / positions
-        if any(marker in text_lower for marker in [
-            "портфел",
-            "позиц",
-            "актив",
-            "мой результат",
-            "общий результат",
-            "результат по портфел",
-            "что с моими пози",
-            "что с моей пози",
+            "мой портфель",
+            "портфель",
+            "мои позиции",
+            "проанализируй портфель",
+            "что с моим портфелем",
+            "что с моими позициями",
+            "как дела у портфеля",
         ]):
             return "portfolio_analysis"
 
-        # risk / return
+        # ---- risk / return ----
         if any(marker in text_lower for marker in [
             "риск",
-            "доходност",
-            "волатиль",
-            "просадк",
-            "в плюсе",
-            "в минусе",
-            "прибыл",
-            "убыт",
-            "pnl",
-            "сколько я заработал",
-            "сколько заработал",
+            "доходность",
+            "риск и доходность",
+            "насколько рискован",
+            "какая доходность",
         ]):
             return "risk_return"
 
-        # scenario
+        # ---- benchmark compare ----
         if any(marker in text_lower for marker in [
-            "сценари",
+            "сравни с индексом",
+            "сравни с бенчмарком",
+            "бенчмарк",
+            "индекс мосбиржи",
+            "imoex",
+        ]):
+            return "benchmark_compare"
+
+        # ---- news ----
+        if any(marker in text_lower for marker in [
+            "новости",
+            "объясни новости",
+            "что по новостям",
+            "новостной фон",
+            "какие новости",
+        ]):
+            return "news_explain"
+
+        # ---- scenario ----
+        if any(marker in text_lower for marker in [
+            "что будет если",
+            "сценарий",
             "прогноз",
-            "что будет",
-            "если рынок",
+            "что может быть",
+            "что дальше",
         ]):
             return "scenario_forecast"
 
-        # generic analysis
+        # ---- price ----
         if any(marker in text_lower for marker in [
-            "аналитик",
-            "проанализиру",
-            "анализ",
+            "цена",
+            "сколько стоит",
+            "котировка",
+            "какая стоимость",
+            "какая цена",
         ]):
+            return "price_check"
+
+        # ---- fallback ----
+        if resolved_tickers:
             return "simple_analysis"
 
         return "general_question"

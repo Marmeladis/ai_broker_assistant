@@ -17,9 +17,15 @@ class AnalyticsService:
         position_market_metrics = context.get("position_market_metrics")
         multi_position_market_metrics = context.get("multi_position_market_metrics", [])
 
+        technical_analysis_context = context.get("technical_analysis_context")
+        dividend_context = context.get("dividend_context")
+        buy_or_wait_context = context.get("buy_or_wait_context")
+        entry_point_context = context.get("entry_point_context")
+        dividend_comment_context = context.get("dividend_comment_context")
+
         if intent == "technical_analysis":
             ticker = (
-                context.get("market_context", {}).get("ticker")
+                (market_context or {}).get("ticker")
                 or (context.get("multi_market_context") or [{}])[0].get("ticker")
             )
 
@@ -29,6 +35,17 @@ class AnalyticsService:
                     "trend_summary": "тикер не определён",
                     "calculated_indicators": {},
                     "confidence_score": 0.2
+                }
+
+            if technical_analysis_context:
+                trend = technical_analysis_context.get("trend")
+                signal = technical_analysis_context.get("signal")
+
+                return {
+                    "report_type": "technical_analysis",
+                    "trend_summary": f"обнаружен тренд: {trend}, сигнал: {signal}",
+                    "calculated_indicators": technical_analysis_context,
+                    "confidence_score": 0.82
                 }
 
             try:
@@ -55,6 +72,88 @@ class AnalyticsService:
                     "calculated_indicators": {},
                     "confidence_score": 0.2
                 }
+
+        if intent == "dividend_info":
+            if dividend_comment_context and dividend_comment_context.get("dividend_found"):
+                return {
+                    "report_type": "dividend_info",
+                    "trend_summary": dividend_comment_context.get("summary"),
+                    "calculated_indicators": {
+                        "ticker": (dividend_context or {}).get("ticker"),
+                        "dividend_found": dividend_comment_context.get("dividend_found"),
+                        "dividend_per_share": dividend_comment_context.get("dividend_per_share"),
+                        "record_date": dividend_comment_context.get("record_date"),
+                        "payment_date": dividend_comment_context.get("payment_date"),
+                        "dividend_yield_percent": dividend_comment_context.get("dividend_yield_percent"),
+                    },
+                    "confidence_score": 0.87
+                }
+
+            return {
+                "report_type": "dividend_info",
+                "trend_summary": "данные по дивидендам не найдены",
+                "calculated_indicators": dividend_context or {},
+                "confidence_score": 0.35
+            }
+
+        if intent == "buy_or_wait":
+            if buy_or_wait_context:
+                decision = buy_or_wait_context.get("decision")
+                summary = buy_or_wait_context.get("summary")
+
+                return {
+                    "report_type": "buy_or_wait",
+                    "trend_summary": summary,
+                    "calculated_indicators": {
+                        "decision": decision,
+                        "summary": summary,
+                        "reasons": buy_or_wait_context.get("reasons", []),
+                        "trend": buy_or_wait_context.get("trend"),
+                        "signal": buy_or_wait_context.get("signal"),
+                        "rsi_14": buy_or_wait_context.get("rsi_14"),
+                        "support": buy_or_wait_context.get("support"),
+                        "resistance": buy_or_wait_context.get("resistance"),
+                        "current_price": buy_or_wait_context.get("current_price"),
+                        "has_dividend_context": buy_or_wait_context.get("has_dividend_context"),
+                        "has_position": buy_or_wait_context.get("has_position"),
+                        "dividend_context": dividend_context,
+                        "position_market_metrics": position_market_metrics,
+                    },
+                    "confidence_score": 0.81
+                }
+
+            return {
+                "report_type": "buy_or_wait",
+                "trend_summary": "недостаточно данных для оценки точки входа",
+                "calculated_indicators": {},
+                "confidence_score": 0.3
+            }
+
+        if intent == "entry_point_analysis":
+            if entry_point_context:
+                return {
+                    "report_type": "entry_point_analysis",
+                    "trend_summary": entry_point_context.get("summary"),
+                    "calculated_indicators": {
+                        "entry_bias": entry_point_context.get("entry_bias"),
+                        "summary": entry_point_context.get("summary"),
+                        "reasons": entry_point_context.get("reasons", []),
+                        "current_price": entry_point_context.get("current_price"),
+                        "support": entry_point_context.get("support"),
+                        "resistance": entry_point_context.get("resistance"),
+                        "signal": entry_point_context.get("signal"),
+                        "trend": entry_point_context.get("trend"),
+                        "rsi_14": entry_point_context.get("rsi_14"),
+                    },
+                    "confidence_score": 0.79
+                }
+
+            return {
+                "report_type": "entry_point_analysis",
+                "trend_summary": "точка входа не определена из-за нехватки данных",
+                "calculated_indicators": {},
+                "confidence_score": 0.28
+            }
 
         if intent == "portfolio_analysis":
             if not portfolio:
@@ -130,7 +229,8 @@ class AnalyticsService:
                         "ticker": news_context.get("ticker"),
                         "display_name": news_context.get("display_name"),
                         "news_count": len(news_context.get("items", [])),
-                        "has_position": position_market_metrics is not None
+                        "has_position": position_market_metrics is not None,
+                        "items": news_context.get("items", [])
                     },
                     "confidence_score": 0.91
                 }
@@ -206,7 +306,8 @@ class AnalyticsService:
                     "has_market_context": bool(market_context or multi_market_context),
                     "has_news_context": bool(news_context or multi_news_context),
                     "has_portfolio": bool(portfolio),
-                    "has_position_metrics": bool(position_market_metrics or multi_position_market_metrics)
+                    "has_position_metrics": bool(position_market_metrics or multi_position_market_metrics),
+                    "has_dividend_context": bool(dividend_context and dividend_context.get("dividend_found"))
                 },
                 "confidence_score": 0.56
             }
@@ -219,6 +320,8 @@ class AnalyticsService:
                     "has_portfolio": bool(portfolio),
                     "has_market_context": bool(market_context or multi_market_context),
                     "has_news_context": bool(news_context or multi_news_context),
+                    "has_dividend_context": bool(dividend_context and dividend_context.get("dividend_found")),
+                    "has_technical_analysis": bool(technical_analysis_context),
                     "total_pnl_percent": portfolio_metrics.get("total_pnl_percent")
                 },
                 "confidence_score": 0.73

@@ -79,38 +79,55 @@ class LLMService:
             }
 
     def build_messages(
-            self,
-            user_text: str,
-            context: dict,
-            intent: str,
-            analytics_result: dict | None = None,
-            fact_summary: dict | None = None
+        self,
+        user_text: str,
+        context: dict,
+        intent: str,
+        analytics_result: dict | None = None,
+        fact_summary: dict | None = None
     ) -> list[dict]:
         system_parts = [
             """
-    Ты — интеллектуальный ассистент для работников брокерской сферы.
+Ты — интеллектуальный ассистент для работников брокерской сферы.
 
-    Пользователь общается с тобой через единый чат.
-    Ты должен учитывать:
-    - историю диалога,
-    - портфель клиента,
-    - агрегированные метрики портфеля,
-    - рыночные данные,
-    - новости,
-    - результаты аналитики,
-    - агрегированные факты по инструменту и позиции.
+ВАЖНО:
+Тебе уже передаются готовые данные от системы:
+- рыночные цены,
+- теханализ,
+- дивидендные данные,
+- портфель пользователя,
+- позиция пользователя по бумаге,
+- аналитические выводы.
 
-    Правила:
-    1. Отвечай строго на русском языке.
-    2. Не выдумывай факты, цены, новости и показатели.
-    3. Если данных недостаточно — прямо скажи об этом.
-    4. Не давай индивидуальных инвестиционных рекомендаций.
-    5. Если пользователь спрашивает про портфель — используй агрегированные метрики портфеля.
-    6. Если пользователь спрашивает про конкретную бумагу — используй цену, новости и данные позиции.
-    7. Если есть текущий P&L по позиции или портфелю — можешь его описать.
-    8. Если пользователь просит технический анализ — используй только доступные индикаторы и не обещай рост или падение как факт.
-    9. Отвечай с разъяснениями(как пятилетнему ребёнку), профессионально, содержательно.
-    """.strip()
+ЭТИ ДАННЫЕ ЯВЛЯЮТСЯ ОСНОВОЙ ОТВЕТА.
+
+Обязательные правила:
+1. Отвечай строго на русском языке.
+2. Не выдумывай факты, даты, дивиденды, цены, сигналы и показатели.
+3. Если данных нет — прямо скажи, что данных недостаточно.
+4. Не говори, что у тебя нет доступа к интернету или рынку, если данные уже переданы системой.
+5. Не отправляй пользователя на сторонние сайты.
+6. Не давай персональную инвестиционную рекомендацию в форме приказа.
+7. Вместо категоричных советов используй аналитические формулировки:
+   - "по текущим данным выглядит..."
+   - "более осторожный сценарий..."
+   - "вход на текущих уровнях выглядит..."
+   - "если цель — дивидендная идея, важно учитывать..."
+8. Если пользователь спрашивает "покупать или подождать", ответ должен быть похож на комментарий брокера:
+   - краткий вывод,
+   - почему,
+   - на что смотреть дальше.
+9. Если пользователь спрашивает про дивиденды:
+   - укажи размер дивиденда, если он есть,
+   - дату закрытия реестра,
+   - ожидаемую дату выплаты,
+   - дивидендную доходность, если она рассчитана.
+10. Если пользователь спрашивает про точку входа:
+   - используй поддержку, сопротивление, тренд, сигнал и RSI.
+11. Отвечай кратко, профессионально, содержательно.
+12. Желательная длина ответа: 4–8 предложений.
+13. Не используй формулировки "точно вырастет", "лучше покупать обязательно", "это лучший момент" как факт.
+""".strip()
         ]
 
         portfolio = context.get("portfolio", [])
@@ -135,7 +152,14 @@ class LLMService:
 
         news_context = context.get("news_context")
         if news_context:
-            system_parts.append(f"Новостной контекст: {news_context}")
+            system_parts.append(
+                f"""
+НОВОСТНОЙ КОНТЕКСТ:
+{news_context}
+
+Если пользователь спрашивает про новости, ты обязан использовать этот блок как источник истины.
+"""
+            )
 
         multi_news_context = context.get("multi_news_context")
         if multi_news_context:
@@ -161,13 +185,79 @@ class LLMService:
         if resolved_instrument:
             system_parts.append(f"Распознанный инструмент: {resolved_instrument}")
 
+        technical_analysis_context = context.get("technical_analysis_context")
+        if technical_analysis_context:
+            system_parts.append(
+                f"""
+ТЕХНИЧЕСКИЙ АНАЛИЗ:
+{technical_analysis_context}
+
+Используй этот блок для ответа на вопросы про тренд, сигнал, точку входа и целесообразность ожидания отката.
+"""
+            )
+
+        dividend_context = context.get("dividend_context")
+        if dividend_context:
+            system_parts.append(
+                f"""
+ДИВИДЕНДНЫЙ КОНТЕКСТ:
+{dividend_context}
+
+Используй этот блок для ответа на вопросы про дивиденды, отсечку и дивидендную доходность.
+"""
+            )
+
+        dividend_text_summary = context.get("dividend_text_summary")
+        if dividend_text_summary:
+            system_parts.append(f"Краткий комментарий по дивидендам: {dividend_text_summary}")
+
+        buy_or_wait_context = context.get("buy_or_wait_context")
+        if buy_or_wait_context:
+            system_parts.append(
+                f"""
+КОНТЕКСТ BUY OR WAIT:
+{buy_or_wait_context}
+
+Если пользователь спрашивает, покупать сейчас или подождать, используй этот блок как основной аналитический вывод.
+"""
+            )
+
+        entry_point_context = context.get("entry_point_context")
+        if entry_point_context:
+            system_parts.append(
+                f"""
+КОНТЕКСТ ТОЧКИ ВХОДА:
+{entry_point_context}
+
+Если пользователь спрашивает про точку входа, используй этот блок как основной аналитический вывод.
+"""
+            )
+
+        dividend_comment_context = context.get("dividend_comment_context")
+        if dividend_comment_context:
+            system_parts.append(
+                f"""
+КОММЕНТАРИЙ ПО ДИВИДЕНДАМ:
+{dividend_comment_context}
+
+Если пользователь спрашивает про дивиденды, используй этот блок как основной аналитический вывод.
+"""
+            )
+
         if fact_summary:
             system_parts.append(f"Агрегированные факты: {fact_summary}")
 
         system_parts.append(f"Определённый intent: {intent}")
 
         if analytics_result:
-            system_parts.append(f"Результат аналитики: {analytics_result}")
+            system_parts.append(
+                f"""
+РЕЗУЛЬТАТ АНАЛИТИКИ:
+{analytics_result}
+
+Это основной слой аналитического ответа. Используй его как базу.
+"""
+            )
 
         messages = [
             {
@@ -234,7 +324,9 @@ class LLMService:
             timeout=self.gigachat_timeout,
             verify=self.gigachat_verify_ssl
         )
-        response.raise_for_status()
+
+        if response.status_code >= 400:
+            raise RuntimeError(f"GigaChat error {response.status_code}: {response.text}")
 
         data = response.json()
         choices = data.get("choices", [])
@@ -291,6 +383,15 @@ class LLMService:
     ) -> str:
         if intent == "technical_analysis":
             return self._technical_analysis_fallback(analytics_result)
+
+        if intent == "dividend_info":
+            return self._dividend_info_fallback(analytics_result)
+
+        if intent == "buy_or_wait":
+            return self._buy_or_wait_fallback(analytics_result)
+
+        if intent == "entry_point_analysis":
+            return self._entry_point_fallback(analytics_result)
 
         if intent == "portfolio_analysis":
             return self._portfolio_analysis_fallback(analytics_result)
@@ -367,6 +468,113 @@ class LLMService:
         if pattern:
             parts.append(f"Обнаруженный паттерн: {pattern}.")
         parts.append("Это технический сигнал, а не инвестиционная рекомендация.")
+        return " ".join(parts)
+
+    def _dividend_info_fallback(self, analytics_result: dict | None) -> str:
+        if not analytics_result:
+            return "Не удалось получить данные по дивидендам."
+
+        data = analytics_result.get("calculated_indicators", {})
+        if not data.get("dividend_found"):
+            return "Данные по дивидендам по этой бумаге сейчас не найдены."
+
+        parts = ["По бумаге найдены дивидендные данные."]
+
+        if data.get("dividend_per_share") is not None:
+            parts.append(f"Размер дивиденда: {data.get('dividend_per_share')}.")
+
+        if data.get("record_date"):
+            parts.append(f"Дата закрытия реестра: {data.get('record_date')}.")
+
+        if data.get("payment_timing_note"):
+            parts.append(f"Ожидаемая дата выплаты: {data.get('payment_timing_note')}.")
+
+        if data.get("dividend_yield_percent") is not None:
+            parts.append(f"Оценочная дивидендная доходность: {data.get('dividend_yield_percent')}%.")
+
+        return " ".join(parts)
+
+    def _buy_or_wait_fallback(self, analytics_result: dict | None) -> str:
+        if not analytics_result:
+            return "Недостаточно данных, чтобы оценить, покупать сейчас или подождать."
+
+        data = analytics_result.get("calculated_indicators", {})
+        summary = data.get("summary")
+        decision = data.get("decision")
+        current_price = data.get("current_price")
+        support = data.get("support")
+        resistance = data.get("resistance")
+        rsi_14 = data.get("rsi_14")
+        trend = data.get("trend")
+        signal = data.get("signal")
+
+        parts = []
+
+        if summary:
+            parts.append(summary)
+
+        if current_price is not None:
+            parts.append(f"Текущая цена: {current_price}.")
+
+        if trend:
+            parts.append(f"Тренд: {trend}.")
+
+        if signal:
+            parts.append(f"Сигнал: {signal}.")
+
+        if rsi_14 is not None:
+            parts.append(f"RSI(14): {round(rsi_14, 4)}.")
+
+        if support is not None:
+            parts.append(f"Поддержка: {round(support, 4)}.")
+
+        if resistance is not None:
+            parts.append(f"Сопротивление: {round(resistance, 4)}.")
+
+        if decision == "buy_zone":
+            parts.append("По текущим данным бумага выглядит относительно интересной для входа, но это не является персональной рекомендацией.")
+        elif decision == "wait_for_better_entry":
+            parts.append("Более осторожный сценарий — дождаться более комфортной точки входа.")
+        elif decision == "neutral_wait":
+            parts.append("Сигналы смешанные, поэтому спешить с входом не обязательно.")
+
+        return " ".join(parts)
+
+    def _entry_point_fallback(self, analytics_result: dict | None) -> str:
+        if not analytics_result:
+            return "Недостаточно данных для анализа точки входа."
+
+        data = analytics_result.get("calculated_indicators", {})
+        summary = data.get("summary")
+        current_price = data.get("current_price")
+        support = data.get("support")
+        resistance = data.get("resistance")
+        signal = data.get("signal")
+        trend = data.get("trend")
+        rsi_14 = data.get("rsi_14")
+
+        parts = []
+
+        if summary:
+            parts.append(summary)
+
+        if current_price is not None:
+            parts.append(f"Текущая цена: {current_price}.")
+
+        if support is not None:
+            parts.append(f"Поддержка: {round(support, 4)}.")
+
+        if resistance is not None:
+            parts.append(f"Сопротивление: {round(resistance, 4)}.")
+
+        if trend:
+            parts.append(f"Тренд: {trend}.")
+
+        if signal:
+            parts.append(f"Сигнал: {signal}.")
+
+        if rsi_14 is not None:
+            parts.append(f"RSI(14): {round(rsi_14, 4)}.")
 
         return " ".join(parts)
 
@@ -396,7 +604,6 @@ class LLMService:
             parts.append(f"Совокупный результат: {pnl_text}.")
         parts.append(f"Позиции в плюсе: {profitable}, в минусе: {losing}.")
         parts.append("Ответ носит информационный характер и не является инвестиционной рекомендацией.")
-
         return " ".join(parts)
 
     def _risk_return_fallback(self, analytics_result: dict | None) -> str:
@@ -434,7 +641,6 @@ class LLMService:
         if pnl_percent is not None:
             parts.append(f"Текущий совокупный результат портфеля: {pnl_percent}%.")
         parts.append("Полноценное сравнение с бенчмарком требует подключения эталонного индекса или стратегии сравнения.")
-
         return " ".join(parts)
 
     def _price_check_fallback(self, analytics_result: dict | None) -> str:
