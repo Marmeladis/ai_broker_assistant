@@ -27,14 +27,6 @@ class InstrumentService:
         return bool(re.fullmatch(r"[A-Z0-9.\-]{1,20}", text))
 
     def resolve_or_create_instrument(self, db: Session, query: str) -> FinancialInstrument | None:
-        """
-        Главный метод:
-        1) ищет по локальному ticker
-        2) ищет по локальным alias/name
-        3) ищет на MOEX по exact secid
-        4) ищет на MOEX по названию
-        5) сохраняет найденный инструмент локально
-        """
         query = (query or "").strip()
         if not query:
             return None
@@ -59,7 +51,6 @@ class InstrumentService:
         query_norm = self.normalize_text(query)
         query_upper = query.strip().upper()
 
-        # 1. exact ticker
         instrument = (
             db.query(FinancialInstrument)
             .filter(FinancialInstrument.ticker == query_upper)
@@ -68,7 +59,6 @@ class InstrumentService:
         if instrument:
             return instrument
 
-        # 2. exact alias
         aliases = db.query(InstrumentAlias).all()
         for alias in aliases:
             if self.normalize_text(alias.alias) == query_norm:
@@ -80,7 +70,6 @@ class InstrumentService:
                 if instrument:
                     return instrument
 
-        # 3. exact / contains name
         instruments = db.query(FinancialInstrument).all()
         for item in instruments:
             item_name_norm = self.normalize_text(item.name or "")
@@ -95,9 +84,6 @@ class InstrumentService:
         return None
 
     def fetch_instrument_by_ticker_from_moex(self, ticker: str) -> dict[str, Any] | None:
-        """
-        Exact lookup по secid через /iss/securities/{SECID}.json
-        """
         ticker = ticker.upper().strip()
         url = f"{self.base_url}/securities/{ticker}.json"
         params = {
@@ -133,10 +119,6 @@ class InstrumentService:
         }
 
     def search_instrument_by_name_from_moex(self, query: str) -> dict[str, Any] | None:
-        """
-        Поиск по названию.
-        Практически удобно использовать /iss/securities.json и отбирать лучший матч.
-        """
         url = f"{self.base_url}/securities.json"
         params = {
             "iss.meta": "off",
@@ -170,7 +152,6 @@ class InstrumentService:
         if not secid:
             return None
 
-        # Доуточняем exact карточку инструмента
         exact = self.fetch_instrument_by_ticker_from_moex(secid)
         if exact:
             return exact
@@ -263,7 +244,7 @@ class InstrumentService:
         return result
 
     def _pick_best_board(self, boards: list[dict[str, Any]]) -> str | None:
-        # приоритет: TQBR, затем primary, затем первая активная
+        #приоритет: TQBR, потом primary, потом первая активная
         if not boards:
             return None
 

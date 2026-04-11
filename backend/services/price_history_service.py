@@ -22,11 +22,6 @@ class PriceHistoryService:
         interval: str = "24",
         limit: int = 30
     ) -> list[dict[str, Any]]:
-        """
-        interval:
-        24 = дневные свечи
-        60 = часовые свечи
-        """
 
         ticker = ticker.upper().strip()
 
@@ -69,7 +64,7 @@ class PriceHistoryService:
 
     def _estimate_days_back(self, interval: str, limit: int) -> int:
         if interval == "24":
-            # запас по дням, чтобы хватило торговых свечей
+            # запас по дням
             return max(limit * 3, 90)
 
         if interval == "60":

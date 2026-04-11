@@ -1,3 +1,4 @@
+import re
 from sqlalchemy.orm import Session
 
 from backend.models import Chat, User
@@ -9,6 +10,8 @@ from backend.services.price_history_service import PriceHistoryService
 from backend.services.technical_analysis_service import TechnicalAnalysisService
 from backend.services.recommendation_service import RecommendationService
 from backend.services.instrument_comparison_service import InstrumentComparisonService
+from backend.services.dividend_service import DividendService
+from backend.services.historical_market_service import HistoricalMarketService
 
 
 class ContextService:
@@ -21,6 +24,8 @@ class ContextService:
         self.technical_analysis_service = TechnicalAnalysisService()
         self.recommendation_service = RecommendationService()
         self.instrument_comparison_service = InstrumentComparisonService()
+        self.dividend_service = DividendService()
+        self.historical_market_service = HistoricalMarketService()
 
     def build_context(
         self,
@@ -121,6 +126,16 @@ class ContextService:
         multi_comparison_items = []
         comparison_context = None
 
+        # Последние исторические/дивидендные контексты
+        requested_year = self._extract_year_from_text(user_text)
+        requested_limit = self._extract_period_limit_from_text(user_text)
+
+        last_dividend_context = None
+        year_dividend_context = None
+        expected_dividend_context = None
+        historical_price_extremes_context = None
+        max_turnover_context = None
+
         # Одиночный контекст
         if market_context and market_context.get("ticker") and market_context.get("price_found"):
             ticker = market_context["ticker"]
@@ -161,8 +176,39 @@ class ContextService:
                 dividend_context=dividend_context
             )
 
+            # последние дивидендные контексты
+            last_dividend_context = self.dividend_service.get_last_dividend(ticker)
+
+            if requested_year:
+                year_dividend_context = self.dividend_service.get_dividend_by_year(
+                    ticker=ticker,
+                    year=requested_year
+                )
+                expected_dividend_context = self.dividend_service.get_expected_dividend(
+                    ticker=ticker,
+                    year=requested_year
+                )
+            else:
+                expected_dividend_context = self.dividend_service.get_expected_dividend(
+                    ticker=ticker,
+                    year=None
+                )
+
+            # Исторические ценовые контексты
+            historical_price_extremes_context = self.historical_market_service.get_price_extremes(
+                ticker=ticker,
+                interval="24",
+                limit=requested_limit
+            )
+
+            max_turnover_context = self.historical_market_service.get_max_turnover_day(
+                ticker=ticker,
+                interval="24",
+                limit=requested_limit
+            )
+
         # Множественный контекст для сравнений
-        for idx, market_item in enumerate(multi_market_context):
+        for market_item in multi_market_context:
             if not market_item.get("price_found"):
                 continue
 
@@ -273,8 +319,39 @@ class ContextService:
             "multi_dividend_contexts": multi_dividend_contexts,
             "multi_entry_point_contexts": multi_entry_point_contexts,
             "multi_buy_or_wait_contexts": multi_buy_or_wait_contexts,
-            "comparison_context": comparison_context
+            "comparison_context": comparison_context,
+            "last_dividend_context": last_dividend_context,
+            "year_dividend_context": year_dividend_context,
+            "expected_dividend_context": expected_dividend_context,
+            "historical_price_extremes_context": historical_price_extremes_context,
+            "max_turnover_context": max_turnover_context,
+            "requested_year": requested_year,
+            "requested_limit": requested_limit
         }
+
+    def _extract_year_from_text(self, text: str) -> int | None:
+        match = re.search(r"\b(20\d{2})\b", text)
+        if not match:
+            return None
+
+        try:
+            return int(match.group(1))
+        except Exception:
+            return None
+
+    def _extract_period_limit_from_text(self, text: str) -> int:
+        text = text.lower().replace("ё", "е")
+
+        if "год назад" in text or "за год" in text:
+            return 365
+        if "за 6 месяцев" in text or "полгода" in text:
+            return 180
+        if "за 3 месяца" in text:
+            return 90
+        if "за месяц" in text:
+            return 30
+
+        return 365
 
     def _should_refresh_portfolio_prices(self, user_text: str) -> bool:
         text = user_text.lower().replace("ё", "е")
@@ -296,6 +373,9 @@ class ContextService:
             "точка входа",
             "дивиденд",
             "что лучше",
+            "минимальная цена",
+            "максимальная цена",
+            "оборот",
         ]
 
         return any(marker in text for marker in refresh_markers)

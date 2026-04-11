@@ -1,29 +1,5 @@
 class InstrumentComparisonService:
-    """
-    Сравнение нескольких инструментов по:
-    - цене
-    - тренду / сигналу
-    - RSI
-    - точке входа
-    - дивидендам
-    - позиции пользователя
-    """
-
     def build_comparison(self, items: list[dict]) -> dict:
-        """
-        items = [
-            {
-                "ticker": ...,
-                "display_name": ...,
-                "market_context": ...,
-                "technical_analysis_context": ...,
-                "dividend_context": ...,
-                "position_market_metrics": ...,
-                "entry_point_context": ...,
-                "buy_or_wait_context": ...,
-            }
-        ]
-        """
         if not items:
             return {
                 "comparison_found": False,

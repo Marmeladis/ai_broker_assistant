@@ -7,10 +7,9 @@ from backend.config import settings
 
 
 class CorporateActionsService:
-    """
-    endpoint:
-    /iss/securities/{ticker}/dividends.json
-    """
+
+    #endpoint:  /iss/securities/{ticker}/dividends.json
+
 
     def __init__(self):
         self.base_url = settings.MOEX_ISS_BASE_URL.rstrip("/")

@@ -9,12 +9,6 @@ class QueryPreprocessorService:
         self.instrument_service = InstrumentService()
 
     def preprocess(self, db: Session, user: User, user_text: str) -> dict:
-        """
-        Возвращает:
-        - original_text: исходный текст
-        - normalized_text: текст, усиленный тикером/именем бумаги
-        - resolved_instrument: найденный инструмент или None
-        """
         original_text = (user_text or "").strip()
         if not original_text:
             return {
@@ -53,10 +47,7 @@ class QueryPreprocessorService:
         }
 
     def _inject_instrument_hint(self, text: str, ticker: str, name: str) -> str:
-        """
-        Добавляет подсказку про инструмент в конец текста, чтобы downstream-сервисы
-        стабильно видели тикер.
-        """
+
         text = text.strip()
 
         upper_text = text.upper()

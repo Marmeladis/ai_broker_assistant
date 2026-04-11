@@ -1,11 +1,4 @@
 class RecommendationService:
-    """
-    Сервис собирает прикладной аналитический вывод:
-    - покупать сейчас или подождать
-    - насколько комфортна точка входа
-    - есть ли дивидендный фактор
-    """
-
     def build_buy_or_wait_context(
         self,
         market_context: dict | None,

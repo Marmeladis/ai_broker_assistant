@@ -5,15 +5,6 @@ from backend.models import ChatSessionState
 
 
 class SessionContextService:
-    """
-    Persistent session context через БД.
-    Хранит:
-    - последний тикер
-    - список последних тикеров
-    - последний intent
-    - последний resolved instrument
-    """
-
     def get_or_create_state(self, db: Session, chat_id: int) -> ChatSessionState:
         state = (
             db.query(ChatSessionState)
@@ -121,10 +112,7 @@ class SessionContextService:
         chat_id: int,
         user_text: str
     ) -> dict:
-        """
-        Если пользователь задаёт follow-up без явного тикера,
-        добавляем подсказку о последнем инструменте.
-        """
+
         user_text = (user_text or "").strip()
         session_context = self.get_context(db, chat_id)
 

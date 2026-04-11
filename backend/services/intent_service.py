@@ -1,3 +1,6 @@
+import re
+
+
 class IntentService:
     def detect_intent(
         self,
@@ -7,20 +10,34 @@ class IntentService:
         text_lower = (text or "").lower().replace("ё", "е").strip()
         resolved_tickers = resolved_tickers or []
 
-        # ---- dividends ----
+        # historical dividend queries
+        if self._looks_like_historical_dividend_query(text_lower):
+            return "historical_dividend_query"
+
+        #  expected dividend queries
+        if self._looks_like_expected_dividend_query(text_lower):
+            return "expected_dividend_query"
+
+        # ---- dividend record date ----
+        if self._looks_like_dividend_record_date_query(text_lower):
+            return "dividend_record_date_query"
+
+        # ---- dividends generic ----
         if any(marker in text_lower for marker in [
             "дивиденд",
             "дивиденды",
             "дивидендная доходность",
-            "когда отсечка",
-            "дата отсечки",
-            "реестр",
-            "закрытие реестра",
-            "когда будут дивиденды",
-            "какие дивиденды",
             "выплата дивидендов",
         ]):
             return "dividend_info"
+
+        # ---- historical price extremes ----
+        if self._looks_like_price_extremes_query(text_lower):
+            return "historical_price_extremes_query"
+
+        # ---- max turnover ----
+        if self._looks_like_max_turnover_query(text_lower):
+            return "max_turnover_query"
 
         # ---- buy / wait / entry point ----
         if any(marker in text_lower for marker in [
@@ -176,3 +193,76 @@ class IntentService:
             return "simple_analysis"
 
         return "general_question"
+
+    def _looks_like_historical_dividend_query(self, text: str) -> bool:
+        has_dividend = any(marker in text for marker in [
+            "дивиденд",
+            "дивиденды",
+            "выплачивался последний дивиденд",
+            "прошлый дивиденд",
+            "последний дивиденд",
+        ])
+        has_year = bool(re.search(r"\b20\d{2}\b", text))
+        has_history_marker = any(marker in text for marker in [
+            "прошлый",
+            "последний",
+            "в 20",
+            "за 20",
+            "был",
+            "выплачивался",
+        ])
+        return has_dividend and (has_year or has_history_marker)
+
+    def _looks_like_expected_dividend_query(self, text: str) -> bool:
+        has_dividend = "дивид" in text
+        has_expected_marker = any(marker in text for marker in [
+            "ожидается",
+            "ожидаемый",
+            "прогнозируется",
+            "за 2025",
+            "за 2026",
+            "ожидается дивиденд",
+        ])
+        return has_dividend and has_expected_marker
+
+    def _looks_like_dividend_record_date_query(self, text: str) -> bool:
+        return any(marker in text for marker in [
+            "дата отсечки",
+            "когда отсечка",
+            "закрытие реестра",
+            "дата закрытия реестра",
+            "реестр по дивидендам",
+        ])
+
+    def _looks_like_price_extremes_query(self, text: str) -> bool:
+        has_price = any(marker in text for marker in [
+            "минимальная цена",
+            "максимальная цена",
+            "минимум",
+            "максимум",
+            "самая низкая цена",
+            "самая высокая цена",
+            "low",
+            "high",
+        ])
+        has_period = any(marker in text for marker in [
+            "год назад",
+            "за год",
+            "за месяц",
+            "за 3 месяца",
+            "за 6 месяцев",
+            "за период",
+            "год",
+            "месяц",
+        ]) or bool(re.search(r"\b20\d{2}\b", text))
+        return has_price and has_period
+
+    def _looks_like_max_turnover_query(self, text: str) -> bool:
+        return any(marker in text for marker in [
+            "максимальный торговый оборот",
+            "максимальный оборот",
+            "самый большой оборот",
+            "наибольший оборот",
+            "максимальный объем торгов",
+            "максимальный обьем торгов",
+        ])
