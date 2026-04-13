@@ -27,7 +27,6 @@ app.include_router(llm_router)
 app.include_router(analytical_report_router)
 app.include_router(chart_router)
 
-
 @app.on_event("startup")
 def startup_seed():
     db = SessionLocal()

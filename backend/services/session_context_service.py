@@ -5,6 +5,8 @@ from backend.models import ChatSessionState
 
 
 class SessionContextService:
+
+
     def get_or_create_state(self, db: Session, chat_id: int) -> ChatSessionState:
         state = (
             db.query(ChatSessionState)
@@ -124,7 +126,7 @@ class SessionContextService:
                 "original_text": user_text,
                 "enriched_text": user_text,
                 "used_session_context": False,
-                "session_context": session_context
+                "session_context": session_context,
             }
 
         if not last_ticker:
@@ -132,7 +134,15 @@ class SessionContextService:
                 "original_text": user_text,
                 "enriched_text": user_text,
                 "used_session_context": False,
-                "session_context": session_context
+                "session_context": session_context,
+            }
+
+        if self._looks_like_broad_market_query(user_text):
+            return {
+                "original_text": user_text,
+                "enriched_text": user_text,
+                "used_session_context": False,
+                "session_context": session_context,
             }
 
         if not self._looks_like_followup(user_text):
@@ -140,23 +150,20 @@ class SessionContextService:
                 "original_text": user_text,
                 "enriched_text": user_text,
                 "used_session_context": False,
-                "session_context": session_context
+                "session_context": session_context,
             }
 
         instrument_name = last_ticker
         if last_resolved_instrument:
             instrument_name = last_resolved_instrument.get("name") or last_ticker
 
-        enriched_text = (
-            f"{user_text} "
-            f"[session_instrument: {instrument_name}, ticker: {last_ticker}]"
-        )
+        enriched_text = f"{user_text} [session_instrument: {instrument_name}, ticker: {last_ticker}]"
 
         return {
             "original_text": user_text,
             "enriched_text": enriched_text,
             "used_session_context": True,
-            "session_context": session_context
+            "session_context": session_context,
         }
 
     def _looks_like_followup(self, text: str) -> bool:
@@ -191,6 +198,9 @@ class SessionContextService:
             "а новости",
             "а тренд",
             "а сигнал",
+            "а какой дивиденд",
+            "а какая отсечка",
+            "а стоит ли покупать",
         ]
 
         short_followups = {
@@ -204,9 +214,39 @@ class SessionContextService:
             "а вход?",
             "а сигнал?",
             "а тренд?",
+            "а какая отсечка?",
+            "а какой дивиденд?",
         }
 
         if text_lower in short_followups:
             return True
 
         return any(marker in text_lower for marker in followup_markers)
+
+    def _looks_like_broad_market_query(self, text: str) -> bool:
+
+        text_lower = text.lower().replace("ё", "е").strip()
+
+        broad_markers = [
+            "какие компании",
+            "какие акции",
+            "какие облигации",
+            "какие бумаги",
+            "покажи топ",
+            "топ дивиденд",
+            "топ облигац",
+            "дивидендные аристократы",
+            "стабильно платят дивиденды",
+            "платят дивиденды каждый год",
+            "устойчивые дивиденды",
+            "самые доходные облигации",
+            "облигации с высоким купоном",
+            "самая высокая дивидендная доходность",
+            "у каких компаний",
+            "лучшие дивидендные бумаги",
+            "рейтинг облигаций",
+            "рейтинг акций",
+            "если я хочу дивиденды, что лучше купить",
+        ]
+
+        return any(marker in text_lower for marker in broad_markers)
