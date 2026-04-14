@@ -86,7 +86,6 @@ class ContextService:
             except Exception:
                 context["expected_dividend_context"] = None
 
-
         try:
             fx_resolved = self.fx_service.resolve_fx_from_text(user_text)
             if fx_resolved:
@@ -119,7 +118,6 @@ class ContextService:
             except Exception:
                 context["bond_ranking_context"] = None
 
-
         if resolved_instrument and resolved_instrument.get("is_bond"):
             try:
                 bond_data = self.bond_service.get_bond_info(
@@ -130,7 +128,6 @@ class ContextService:
                 context["bond_context"] = None
 
         return context
-
 
     def _needs_dividend_ranking(self, text: str) -> bool:
         text = text.lower()
