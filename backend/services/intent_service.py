@@ -10,6 +10,15 @@ class IntentService:
         text_lower = (text or "").lower().replace("ё", "е").strip()
         resolved_tickers = resolved_tickers or []
 
+        if any(word in text_lower for word in [
+            "доллар", "usd",
+            "евро", "eur",
+            "юань", "cny",
+            "рубль", "rub",
+            "курс валют"
+        ]):
+            return "fx_price_query"
+
         # historical dividend queries
         if self._looks_like_historical_dividend_query(text_lower):
             return "historical_dividend_query"
