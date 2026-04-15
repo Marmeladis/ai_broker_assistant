@@ -13,59 +13,51 @@ class InstrumentResolverService:
         return text
 
     def tokenize(self, text: str) -> list[str]:
-        return self.normalize_text(text).split()
+        normalized = self.normalize_text(text)
+        return normalized.split()
 
-    def resolve(self, db: Session, text: str) -> dict:
-        """
-        Главный метод (использовать ВЕЗДЕ)
-        """
+    def resolve_ticker_from_text(self, db: Session, text: str) -> str | None:
+        tickers = self.resolve_tickers_from_text(db, text)
+        return tickers[0] if tickers else None
+
+    def resolve_tickers_from_text(self, db: Session, text: str) -> list[str]:
         if not text:
-            return {
-                "tickers": [],
-                "primary_ticker": None,
-                "display_names": {}
-            }
+            return []
 
         normalized_text = self.normalize_text(text)
         tokens = self.tokenize(text)
 
         instruments = db.query(FinancialInstrument).all()
-
-        ticker_map = {inst.ticker.upper(): inst for inst in instruments}
+        known_tickers = {inst.ticker.upper(): inst.ticker.upper() for inst in instruments}
 
         found = []
 
-        # 1. прямые тикеры
+        #Прямые тикеры
         for token in tokens:
-            t = token.upper()
-            if t in ticker_map and t not in found:
-                found.append(t)
+            token_upper = token.upper()
+            if token_upper in known_tickers and token_upper not in found:
+                found.append(token_upper)
 
-        # 2. алиасы
+        #Названия
         aliases = db.query(InstrumentAlias).all()
-
-        alias_pairs = [
-            (self.normalize_text(a.alias), a.ticker.upper())
-            for a in aliases
-        ]
+        alias_pairs = []
+        for item in aliases:
+            alias_pairs.append((self.normalize_text(item.alias), item.ticker.upper()))
 
         alias_pairs.sort(key=lambda x: len(x[0]), reverse=True)
 
         for alias_text, ticker in alias_pairs:
-            if alias_text and alias_text in normalized_text:
-                if ticker not in found:
-                    found.append(ticker)
+            if alias_text and alias_text in normalized_text and ticker not in found:
+                found.append(ticker)
 
-        # display names
-        display_names = {}
-        for ticker in found:
-            inst = ticker_map.get(ticker)
-            display_names[ticker] = (
-                inst.name if inst and inst.name else ticker
-            )
+        return found
 
-        return {
-            "tickers": found,
-            "primary_ticker": found[0] if found else None,
-            "display_names": display_names
-        }
+    def get_instrument_display_name(self, db: Session, ticker: str) -> str:
+        instrument = db.query(FinancialInstrument).filter(
+            FinancialInstrument.ticker == ticker.upper()
+        ).first()
+
+        if instrument and instrument.name:
+            return instrument.name
+
+        return ticker.upper()

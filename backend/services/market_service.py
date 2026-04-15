@@ -255,38 +255,3 @@ class MarketService:
             "absolute_pnl": round(total_pnl, 4),
             "pnl_percent": round(pnl_percent, 4) if pnl_percent is not None else None
         }
-
-    def get_currency_price(self, pair: str):
-
-        mapping = {
-            "USD": "USD000UTSTOM",
-            "EUR": "EUR_RUB__TOM",
-            "CNY": "CNYRUB_TOM",
-            "USD/RUB": "USD000UTSTOM",
-            "EUR/RUB": "EUR_RUB__TOM",
-            "CNY/RUB": "CNYRUB_TOM",
-        }
-
-        secid = mapping.get(pair.upper())
-
-        if not secid:
-            return None
-
-        url = f"{self.base_url}/engines/currency/markets/selt/securities/{secid}.json"
-
-        data = self._safe_request(url)
-
-        market_data = data.get("marketdata", {}).get("data", [])
-        columns = data.get("marketdata", {}).get("columns", [])
-
-        if not market_data:
-            return None
-
-        row = dict(zip(columns, market_data[0]))
-
-        return {
-            "price": row.get("LAST"),
-            "currency": "RUB",
-            "ticker": pair,
-            "source": "moex_currency"
-        }
