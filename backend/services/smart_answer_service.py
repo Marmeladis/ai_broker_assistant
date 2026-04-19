@@ -32,10 +32,10 @@ class SmartAnswerService:
             return self._historical_dividend_answer(analytics_result)
 
         if intent == "expected_dividend_query":
-            return self._expected_dividend_answer(analytics_result)
+            return self._expected_dividend_answer(user_text, analytics_result)
 
         if intent == "dividend_record_date_query":
-            return self._dividend_record_date_answer(analytics_result)
+            return self._dividend_record_date_answer(user_text, analytics_result)
 
         if intent == "historical_price_extremes_query":
             return self._historical_price_extremes_answer(analytics_result)
@@ -297,12 +297,23 @@ class SmartAnswerService:
 
         return " ".join(parts)
 
-    def _expected_dividend_answer(self, analytics_result: dict | None) -> str | None:
-        data = (analytics_result or {}).get("calculated_indicators", {})
+    def _expected_dividend_answer(self, user_text: str, analytics_result: dict | None) -> str | None:
+        analytics_result = analytics_result or {}
+        success = analytics_result.get("success")
+        message = analytics_result.get("message")
+        requested_year = analytics_result.get("requested_year")
+        data = analytics_result.get("calculated_indicators", {}) or {}
+
+        if success is False:
+            return message or (
+                f"По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге за {requested_year} год."
+                if requested_year else
+                "По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге."
+            )
+
         if not data or not data.get("dividend_found"):
-            year = data.get("year")
-            if year:
-                return f"По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге за {year} год."
+            if requested_year:
+                return f"По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге за {requested_year} год."
             return "По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге."
 
         ticker = data.get("ticker")
@@ -311,9 +322,105 @@ class SmartAnswerService:
         currency = data.get("currency")
         record_date = data.get("record_date")
         declared_date = data.get("declared_date")
+        t1_buy_date = data.get("t1_buy_date")
+        planned_payment_date = data.get("planned_payment_date")
+        source_name = data.get("source_name")
+        status = data.get("status")
+        price = data.get("price")
+        dividend_yield_percent = data.get("dividend_yield_percent")
+
+        text_lower = (user_text or "").lower().replace("ё", "е")
+
+        asks_buy_date = any(marker in text_lower for marker in [
+            "до какой даты купить",
+            "когда купить под дивиденды",
+            "дата покупки под дивиденды",
+            "купить под дивиденды",
+            "t+1",
+        ])
+
+        asks_record_date = any(marker in text_lower for marker in [
+            "дата отсечки",
+            "когда дата отсечки",
+            "отсечка",
+            "дата закрытия реестра",
+            "закрытие реестра",
+        ])
+
+        asks_payment_date = any(marker in text_lower for marker in [
+            "плановая дата выплаты",
+            "когда выплата",
+            "когда плановая выплата",
+            "дата выплаты",
+            "когда выплатят",
+        ])
+
+        asks_only_dividend = (
+            "дивиденд" in text_lower or "дивиденды" in text_lower
+        ) and not asks_buy_date and not asks_record_date and not asks_payment_date
 
         parts = []
-        if year:
+
+        # 1. Точечный ответ на "до какой даты купить"
+        if asks_buy_date and t1_buy_date:
+            parts.append(f"Купить под дивиденды по бумаге {ticker} нужно до {t1_buy_date}.")
+            if record_date:
+                parts.append(f"Дата отсечки: {record_date}.")
+            if planned_payment_date:
+                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
+            if dividend_per_share is not None:
+                parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
+            if status:
+                parts.append(f"Статус: {status}.")
+            if source_name:
+                parts.append(f"Источник: {source_name}.")
+            return " ".join(parts)
+
+        # 2. Точечный ответ на "когда дата отсечки"
+        if asks_record_date and record_date:
+            parts.append(f"Дата отсечки по бумаге {ticker}: {record_date}.")
+            if t1_buy_date:
+                parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
+            if planned_payment_date:
+                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
+            if dividend_per_share is not None:
+                parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
+            if status:
+                parts.append(f"Статус: {status}.")
+            if source_name:
+                parts.append(f"Источник: {source_name}.")
+            return " ".join(parts)
+
+        # 3. Точечный ответ на "когда выплата"
+        if asks_payment_date and planned_payment_date:
+            parts.append(f"Плановая дата выплаты по бумаге {ticker}: {planned_payment_date}.")
+            if record_date:
+                parts.append(f"Дата отсечки: {record_date}.")
+            if t1_buy_date:
+                parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
+            if dividend_per_share is not None:
+                parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
+            if status:
+                parts.append(f"Статус: {status}.")
+            if source_name:
+                parts.append(f"Источник: {source_name}.")
+            return " ".join(parts)
+
+        # 4. Общий ответ про дивиденд
+        if requested_year:
+            if status == "Подтверждено":
+                parts.append(
+                    f"По календарю дивидендов для бумаги {ticker} за {requested_year} год подтверждён дивиденд {dividend_per_share} {currency or ''}."
+                )
+            elif status == "Рекомендовано":
+                parts.append(
+                    f"По календарю дивидендов для бумаги {ticker} за {requested_year} год рекомендован дивиденд {dividend_per_share} {currency or ''}."
+                )
+            else:
+                parts.append(
+                    f"По текущим данным ориентир по дивиденду для бумаги {ticker} за {requested_year} год составляет {dividend_per_share} {currency or ''}."
+                )
+        elif year:
             parts.append(
                 f"По текущим данным ориентир по дивиденду для бумаги {ticker} за {year} год составляет {dividend_per_share} {currency or ''}."
             )
@@ -324,24 +431,89 @@ class SmartAnswerService:
 
         if record_date:
             parts.append(f"Дата отсечки: {record_date}.")
+        if t1_buy_date:
+            parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
+            parts.append("Это последний день покупки на бирже, чтобы попасть в реестр на дивиденды.")
+        if planned_payment_date:
+            parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
         if declared_date:
             parts.append(f"Дата решения: {declared_date}.")
+        if status:
+            parts.append(f"Статус: {status}.")
+        if price is not None:
+            parts.append(f"Цена бумаги в календаре: {price}.")
+        if dividend_yield_percent is not None:
+            parts.append(f"Дивидендная доходность: {dividend_yield_percent}%.")
+        if source_name:
+            parts.append(f"Источник: {source_name}.")
         if data.get("is_expected_proxy"):
             parts.append("Это ориентир по доступным данным, а не гарантированное будущее решение по дивидендам.")
 
         return " ".join(parts)
 
-    def _dividend_record_date_answer(self, analytics_result: dict | None) -> str | None:
-        data = (analytics_result or {}).get("calculated_indicators", {})
-        if not data or not data.get("record_date"):
+    def _dividend_record_date_answer(self, user_text: str, analytics_result: dict | None) -> str | None:
+        analytics_result = analytics_result or {}
+        success = analytics_result.get("success")
+        message = analytics_result.get("message")
+        data = analytics_result.get("calculated_indicators", {}) or {}
+
+        if success is False and message:
+            return message
+
+        if not data:
+            return "По этой бумаге у меня сейчас нет подтверждённой даты отсечки."
+
+        record_date = data.get("record_date")
+        t1_buy_date = data.get("t1_buy_date")
+        planned_payment_date = data.get("planned_payment_date")
+        ticker = data.get("ticker")
+        dividend_per_share = data.get("dividend_per_share")
+        currency = data.get("currency")
+        status = data.get("status")
+
+        text_lower = (user_text or "").lower().replace("ё", "е")
+        asks_buy_date = any(marker in text_lower for marker in [
+            "до какой даты купить",
+            "когда купить под дивиденды",
+            "дата покупки под дивиденды",
+            "купить под дивиденды",
+            "t+1",
+        ])
+
+        if asks_buy_date:
+            if not t1_buy_date:
+                year = data.get("year")
+                if year:
+                    return f"По этой бумаге у меня сейчас нет подтверждённой даты покупки под дивиденды за {year} год."
+                return "По этой бумаге у меня сейчас нет подтверждённой даты покупки под дивиденды."
+
+            parts = [f"Купить под дивиденды по бумаге {ticker} нужно до {t1_buy_date}."]
+            if record_date:
+                parts.append(f"Дата отсечки: {record_date}.")
+            if planned_payment_date:
+                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
+            if dividend_per_share is not None:
+                parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
+            if status:
+                parts.append(f"Статус: {status}.")
+            return " ".join(parts)
+
+        if not record_date:
             year = data.get("year")
             if year:
                 return f"По этой бумаге у меня сейчас нет подтверждённой даты отсечки за {year} год."
             return "По этой бумаге у меня сейчас нет подтверждённой даты отсечки."
 
-        parts = [f"Дата отсечки по бумаге {data.get('ticker')}: {data.get('record_date')}."]
-        if data.get("dividend_per_share") is not None:
-            parts.append(f"Размер дивиденда в этом контексте: {data.get('dividend_per_share')} {data.get('currency') or ''}.")
+        parts = [f"Дата отсечки по бумаге {ticker}: {record_date}."]
+        if t1_buy_date:
+            parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
+            parts.append("Это последний день покупки на бирже, чтобы попасть в реестр на дивиденды.")
+        if planned_payment_date:
+            parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
+        if dividend_per_share is not None:
+            parts.append(f"Размер дивиденда в этом контексте: {dividend_per_share} {currency or ''}.")
+        if status:
+            parts.append(f"Статус: {status}.")
         parts.append("Поступление дивидендов обычно ожидается в срок до 25 рабочих дней после даты закрытия реестра.")
         return " ".join(parts)
 

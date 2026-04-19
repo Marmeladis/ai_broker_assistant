@@ -26,6 +26,7 @@ class AnalyticsService:
         last_dividend_context = context.get("last_dividend_context") or {}
         year_dividend_context = context.get("year_dividend_context") or {}
         expected_dividend_context = context.get("expected_dividend_context") or {}
+        expected_dividend_calendar_context = context.get("expected_dividend_calendar_context") or {}
 
         historical_price_extremes_context = context.get("historical_price_extremes_context") or {}
         max_turnover_context = context.get("max_turnover_context") or {}
@@ -167,25 +168,180 @@ class AnalyticsService:
             }
 
         if intent == "expected_dividend_query":
-            found = bool(expected_dividend_context)
+            if requested_year is not None:
+                if requested_year == 2026:
+                    if not expected_dividend_calendar_context:
+                        return {
+                            "report_type": "expected_dividend_query",
+                            "requested_year": requested_year,
+                            "success": False,
+                            "message": f"По календарю дивидендов за {requested_year} год подтверждённых данных по этой бумаге нет.",
+                            "calculated_indicators": {
+                                "ticker": market_context.get("ticker"),
+                                "year": requested_year,
+                                "dividend_found": False,
+                                "dividend_per_share": None,
+                                "record_date": None,
+                                "declared_date": None,
+                                "planned_payment_date": None,
+                                "currency": None,
+                                "source_name": None,
+                                "is_expected_proxy": False,
+                                "t1_buy_date": None,
+                                "status": None,
+                                "dividend_yield_percent": None,
+                                "price": None,
+                            },
+                            "confidence_score": 0.2,
+                        }
+
+                    return {
+                        "report_type": "expected_dividend_query",
+                        "requested_year": requested_year,
+                        "success": True,
+                        "message": None,
+                        "calculated_indicators": {
+                            "ticker": expected_dividend_calendar_context.get("ticker") or market_context.get("ticker"),
+                            "year": requested_year,
+                            "dividend_found": True,
+                            "dividend_per_share": expected_dividend_calendar_context.get("dividend_per_share"),
+                            "record_date": expected_dividend_calendar_context.get("record_date"),
+                            "declared_date": expected_dividend_calendar_context.get("declared_date"),
+                            "planned_payment_date": expected_dividend_calendar_context.get("planned_payment_date"),
+                            "currency": expected_dividend_calendar_context.get("currency") or "RUB",
+                            "source_name": expected_dividend_calendar_context.get("source") or "dividend_calendar_db",
+                            "is_expected_proxy": False,
+                            "t1_buy_date": expected_dividend_calendar_context.get("t1_buy_date"),
+                            "status": expected_dividend_calendar_context.get("status"),
+                            "dividend_yield_percent": expected_dividend_calendar_context.get("dividend_yield_percent"),
+                            "price": expected_dividend_calendar_context.get("price"),
+                            "sector": expected_dividend_calendar_context.get("sector"),
+                        },
+                        "confidence_score": 0.98,
+                    }
+
+                if not expected_dividend_context or expected_dividend_context.get("year") != requested_year:
+                    return {
+                        "report_type": "expected_dividend_query",
+                        "requested_year": requested_year,
+                        "success": False,
+                        "message": f"По текущим данным у меня нет подтверждённого дивидендного ориентира по этой бумаге за {requested_year} год.",
+                        "calculated_indicators": {
+                            "ticker": market_context.get("ticker"),
+                            "year": requested_year,
+                            "dividend_found": False,
+                            "dividend_per_share": None,
+                            "record_date": None,
+                            "declared_date": None,
+                            "planned_payment_date": None,
+                            "currency": None,
+                            "source_name": None,
+                            "is_expected_proxy": False,
+                        },
+                        "confidence_score": 0.2,
+                    }
+
+                return {
+                    "report_type": "expected_dividend_query",
+                    "requested_year": requested_year,
+                    "success": True,
+                    "message": None,
+                    "calculated_indicators": {
+                        "ticker": expected_dividend_context.get("ticker") or market_context.get("ticker"),
+                        "year": expected_dividend_context.get("year"),
+                        "dividend_found": True,
+                        "dividend_per_share": expected_dividend_context.get("dividend_per_share"),
+                        "record_date": expected_dividend_context.get("record_date"),
+                        "declared_date": expected_dividend_context.get("declared_date"),
+                        "planned_payment_date": expected_dividend_context.get("planned_payment_date"),
+                        "currency": expected_dividend_context.get("currency"),
+                        "source_name": expected_dividend_context.get("source_name"),
+                        "is_expected_proxy": False,
+                    },
+                    "confidence_score": 0.85,
+                }
+
+            if expected_dividend_context:
+                return {
+                    "report_type": "expected_dividend_query",
+                    "requested_year": None,
+                    "success": True,
+                    "message": None,
+                    "calculated_indicators": {
+                        "ticker": expected_dividend_context.get("ticker") or market_context.get("ticker"),
+                        "year": expected_dividend_context.get("year"),
+                        "dividend_found": True,
+                        "dividend_per_share": expected_dividend_context.get("dividend_per_share"),
+                        "record_date": expected_dividend_context.get("record_date"),
+                        "declared_date": expected_dividend_context.get("declared_date"),
+                        "planned_payment_date": expected_dividend_context.get("planned_payment_date"),
+                        "currency": expected_dividend_context.get("currency"),
+                        "source_name": expected_dividend_context.get("source_name"),
+                        "is_expected_proxy": True,
+                    },
+                    "confidence_score": 0.75,
+                }
+
             return {
                 "report_type": "expected_dividend_query",
-                "trend_summary": "Ожидаемый дивидендный ориентир",
+                "requested_year": None,
+                "success": False,
+                "message": "Нет данных по ожидаемым дивидендам.",
                 "calculated_indicators": {
-                    "ticker": expected_dividend_context.get("ticker") or market_context.get("ticker"),
-                    "year": expected_dividend_context.get("year") or requested_year,
-                    "dividend_found": found,
-                    "dividend_per_share": expected_dividend_context.get("dividend_per_share"),
-                    "record_date": expected_dividend_context.get("record_date"),
-                    "declared_date": expected_dividend_context.get("declared_date"),
-                    "currency": expected_dividend_context.get("currency"),
-                    "source_name": expected_dividend_context.get("source_name"),
-                    "is_expected_proxy": True if expected_dividend_context else False,
+                    "ticker": market_context.get("ticker"),
+                    "year": None,
+                    "dividend_found": False,
+                    "dividend_per_share": None,
+                    "record_date": None,
+                    "declared_date": None,
+                    "planned_payment_date": None,
+                    "currency": None,
+                    "source_name": None,
+                    "is_expected_proxy": False,
                 },
-                "confidence_score": 0.78 if found else 0.2,
+                "confidence_score": 0.2,
             }
 
         if intent == "dividend_record_date_query":
+            if requested_year == 2026:
+                if not expected_dividend_calendar_context:
+                    return {
+                        "report_type": "dividend_record_date_query",
+                        "requested_year": requested_year,
+                        "success": False,
+                        "message": f"По календарю дивидендов за {requested_year} год подтверждённых данных по этой бумаге нет.",
+                        "calculated_indicators": {
+                            "ticker": market_context.get("ticker"),
+                            "year": requested_year,
+                            "dividend_found": False,
+                            "record_date": None,
+                            "t1_buy_date": None,
+                            "planned_payment_date": None,
+                            "dividend_per_share": None,
+                            "currency": None,
+                        },
+                        "confidence_score": 0.2,
+                    }
+
+                return {
+                    "report_type": "dividend_record_date_query",
+                    "requested_year": requested_year,
+                    "success": True,
+                    "message": None,
+                    "calculated_indicators": {
+                        "ticker": expected_dividend_calendar_context.get("ticker") or market_context.get("ticker"),
+                        "year": requested_year,
+                        "dividend_found": True,
+                        "record_date": expected_dividend_calendar_context.get("record_date"),
+                        "t1_buy_date": expected_dividend_calendar_context.get("t1_buy_date"),
+                        "planned_payment_date": expected_dividend_calendar_context.get("planned_payment_date"),
+                        "dividend_per_share": expected_dividend_calendar_context.get("dividend_per_share"),
+                        "currency": expected_dividend_calendar_context.get("currency") or "RUB",
+                        "status": expected_dividend_calendar_context.get("status"),
+                    },
+                    "confidence_score": 0.95,
+                }
+
             target = year_dividend_context if (requested_year and year_dividend_context) else last_dividend_context
             found = bool(target and target.get("record_date"))
             return {

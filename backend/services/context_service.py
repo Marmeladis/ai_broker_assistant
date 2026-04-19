@@ -14,6 +14,7 @@ from backend.services.dividend_service import DividendService
 from backend.services.historical_market_service import HistoricalMarketService
 from backend.services.fx_service import FXService
 from backend.services.bond_service import BondService
+from backend.services.dividend_calendar_db_service import DividendCalendarDBService
 
 
 class ContextService:
@@ -30,6 +31,7 @@ class ContextService:
         self.historical_market_service = HistoricalMarketService()
         self.fx_service = FXService()
         self.bond_service = BondService()
+        self.dividend_calendar_db_service = DividendCalendarDBService()
 
     def build_context(
         self,
@@ -143,10 +145,10 @@ class ContextService:
         last_dividend_context = None
         year_dividend_context = None
         expected_dividend_context = None
+        expected_dividend_calendar_context = None
         historical_price_extremes_context = None
         max_turnover_context = None
 
-        # FX
         fx_context = None
         fx_price_context = None
         try:
@@ -157,7 +159,6 @@ class ContextService:
             fx_context = None
             fx_price_context = None
 
-        # Bonds
         bond_context = None
         bond_last_coupon_context = None
         bond_next_coupon_context = None
@@ -176,7 +177,23 @@ class ContextService:
             bond_next_coupon_context = None
             bond_coupon_schedule_context = None
 
-        # Single instrument context
+        # Ключевые идентификаторы бумаги
+        ticker_for_calendar = None
+        display_name_for_calendar = None
+
+        if market_context and market_context.get("ticker"):
+            ticker_for_calendar = market_context.get("ticker")
+
+        if market_context and market_context.get("display_name"):
+            display_name_for_calendar = market_context.get("display_name")
+
+        if not ticker_for_calendar and tickers:
+            ticker_for_calendar = tickers[0]
+
+        if not display_name_for_calendar and resolved_instrument and resolved_instrument.get("name"):
+            display_name_for_calendar = resolved_instrument.get("name")
+
+        # Рыночная / тех / обычная дивидендная аналитика — только если есть цена
         if market_context and market_context.get("ticker") and market_context.get("price_found"):
             ticker = market_context["ticker"]
             current_price = market_context.get("price")
@@ -271,7 +288,20 @@ class ContextService:
             except Exception:
                 max_turnover_context = None
 
-        # Multi instrument context
+        # Критичный фикс: календарь 2026 ищем отдельно от price_found
+        try:
+            if requested_year == 2026:
+                item = self.dividend_calendar_db_service.find_best_match(
+                    db,
+                    ticker=ticker_for_calendar,
+                    display_name=display_name_for_calendar,
+                    user_text=user_text,
+                    year=2026,
+                )
+                expected_dividend_calendar_context = self.dividend_calendar_db_service.to_context_dict(item)
+        except Exception:
+            expected_dividend_calendar_context = None
+
         for market_item in multi_market_context:
             if not market_item.get("price_found"):
                 continue
@@ -366,7 +396,6 @@ class ContextService:
             except Exception:
                 comparison_context = None
 
-        # Rankings
         bond_ranking_context = None
         if "облигац" in user_text.lower():
             try:
@@ -392,6 +421,7 @@ class ContextService:
 
         dividend_aristocrats_context = None
         if any(marker in lowered_text for marker in [
+            "дивидендные аристократы",
             "аристократ",
             "стабильно",
             "каждый год",
@@ -434,6 +464,7 @@ class ContextService:
             "last_dividend_context": last_dividend_context,
             "year_dividend_context": year_dividend_context,
             "expected_dividend_context": expected_dividend_context,
+            "expected_dividend_calendar_context": expected_dividend_calendar_context,
             "historical_price_extremes_context": historical_price_extremes_context,
             "max_turnover_context": max_turnover_context,
             "requested_year": requested_year,
