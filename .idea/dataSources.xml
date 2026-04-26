@@ -2,7 +2,7 @@
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
     <data-source source="LOCAL" name="broker" uuid="9c8026c9-c5e8-4498-84d1-4bfe4ee8b2e7">
-      <driver-ref>sqlite.xerial</driver-ref>
+      <driver-ref>be864ab7-0bb1-4180-a58a-b61c1b3ede64</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:C:\Users\ulevd\PycharmProjects\broker_assistant\broker.db</jdbc-url>

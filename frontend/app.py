@@ -3,36 +3,26 @@ import requests
 import pandas as pd
 import plotly.graph_objects as go
 
-
 API_BASE_URL = "http://127.0.0.1:8000"
 
 session = requests.Session()
 session.trust_env = False
 
-
-# =========================
-# Page config
-# =========================
 st.set_page_config(
     page_title="Broker Assistant",
-    page_icon="📈",
     layout="wide"
 )
 
-
-# =========================
-# Session state
-# =========================
 DEFAULT_SESSION_STATE = {
     "token": None,
     "user": None,
     "auth_mode": "login",
+    "active_page": "dialog",
     "last_resolved_instrument": None,
     "chart_search_query": "",
     "chart_resolved_name": None,
     "chart_ticker": "SBER",
-    "chart_interval": "24",
-    "chart_limit": 60,
+    "chart_period": "day",
 }
 
 for key, value in DEFAULT_SESSION_STATE.items():
@@ -40,86 +30,179 @@ for key, value in DEFAULT_SESSION_STATE.items():
         st.session_state[key] = value
 
 
-# =========================
-# Sticky styles
-# =========================
-def inject_sticky_styles():
+def inject_styles():
     st.markdown(
         """
         <style>
+        html, body, [class*="css"] {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            font-size: 19px;
+            color: #1f2937;
+        }
+
+
+        /* Заголовки */
+        h1 {
+            font-size: 34px;
+        }
+
+        h2 {
+            font-size: 28px;
+        }
+
+        h3 {
+            font-size: 24px;
+        }
+
+        h4 {
+            font-size: 20px;
+        }
+
+        /* Markdown внутри Streamlit */
+        .stMarkdown p {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        /* Чат сообщения */
+        div[data-testid="stChatMessage"] p {
+            font-size: 18px;
+        }
+
+        /* Поле ввода */
+        textarea, input {
+            font-size: 17px !important;
+        }
+
+        /* Caption (мелкий текст) */
+        .stCaption {
+            font-size: 15px;
+            color: #6b7280;
+        }
+
+        /* Sidebar */
+        section[data-testid="stSidebar"] {
+            font-size: 16px;
+        }
+
+        /* Кнопки */
+        .stButton>button {
+            font-size: 16px;
+            padding: 8px 14px;
+        }
+
+
+        /* ===== Убираем "жирный/кривой" markdown Streamlit ===== */
+        .stMarkdown h3 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* ===== Цвета (убираем красный Streamlit) ===== */
         :root {
-            --sticky-bg: rgba(255, 255, 255, 0.97);
-            --sticky-border: rgba(49, 51, 63, 0.12);
-            --sticky-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            --primary-color: #2563eb; /* синий */
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --sticky-bg: rgba(14, 17, 23, 0.96);
-                --sticky-border: rgba(250, 250, 250, 0.10);
-                --sticky-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-            }
+        .stButton>button {
+            border-radius: 10px;
+            border: 1px solid #d1d5db;
+            background-color: #f9fafb;
+            color: #1f2937;
         }
 
-        .sticky-header {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            background: var(--sticky-bg);
-            border-bottom: 1px solid var(--sticky-border);
-            box-shadow: var(--sticky-shadow);
-            padding: 0.4rem 0 0.75rem 0;
-            margin-bottom: 1rem;
+        .stButton>button:hover {
+            background-color: #e5e7eb;
         }
 
-        .sticky-side {
-            position: sticky;
-            top: 1rem;
-            z-index: 30;
+        /* primary кнопки → синие */
+        .stButton>button[kind="primary"] {
+            background-color: #2563eb;
+            color: white;
+            border: none;
         }
 
-        .side-card {
-            background: var(--sticky-bg);
-            border: 1px solid var(--sticky-border);
-            border-radius: 14px;
-            box-shadow: var(--sticky-shadow);
-            padding: 1rem;
+        /* alerts вместо красных */
+        .stAlert {
+            border-radius: 10px;
         }
 
+        div[data-baseweb="notification"] {
+            border-left: 4px solid #2563eb !important;
+        }
+
+        /* ===== Выравнивание контента ===== */
+        .content-shell {
+            max-width: 900px;
+            margin: 0 auto;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        /* ===== Чат ===== */
+        div[data-testid="stChatMessage"] {
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ===== Поле ввода — ровно по центру ===== */
         div[data-testid="stChatInput"] {
-            position: sticky;
+            position: fixed;
             bottom: 0;
-            z-index: 60;
-            background: var(--sticky-bg);
-            border-top: 1px solid var(--sticky-border);
-            padding-top: 0.75rem;
-            padding-bottom: 0.35rem;
-            margin-top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(900px, calc(100vw - 40px));
+            z-index: 100;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 16px;
         }
 
-        div[data-baseweb="tab-list"] {
-            position: sticky;
-            top: 0;
-            z-index: 70;
-            background: var(--sticky-bg);
-            border-bottom: 1px solid var(--sticky-border);
-            padding-top: 0.2rem;
-            padding-bottom: 0.15rem;
-            margin-bottom: 0.75rem;
+        /* ===== Убираем лишнюю жирность caption ===== */
+        .stCaption {
+            color: #6b7280;
+            font-size: 13px;
         }
 
-        .chat-bottom-spacer {
-            height: 0.75rem;
-        }
         </style>
         """,
         unsafe_allow_html=True
     )
 
 
-# =========================
-# API helpers
-# =========================
+def render_header():
+    st.markdown('<div class="page-shell">', unsafe_allow_html=True)
+    st.title("Broker Assistant")
+    st.caption("Интеллектуальный ассистент для брокерской сферы")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_top_navigation():
+    st.markdown('<div class="top-nav-wrap">', unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button(
+                "Диалог",
+                use_container_width=True,
+                key="top_nav_dialog",
+                type="primary" if st.session_state.active_page == "dialog" else "secondary"
+        ):
+            st.session_state.active_page = "dialog"
+            st.rerun()
+
+    with col2:
+        if st.button(
+                "Аналитический экран",
+                use_container_width=True,
+                key="top_nav_analytics",
+                type="primary" if st.session_state.active_page == "analytics" else "secondary"
+        ):
+            st.session_state.active_page = "analytics"
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
 def build_url(path: str) -> str:
     return f"{API_BASE_URL}{path}"
 
@@ -163,9 +246,6 @@ def show_api_error(response):
             st.text(response.text)
 
 
-# =========================
-# Auth / user helpers
-# =========================
 def load_current_user() -> bool:
     try:
         response = api_get("/auth/me")
@@ -191,9 +271,6 @@ def logout():
     st.rerun()
 
 
-# =========================
-# Data loaders
-# =========================
 def load_chat():
     try:
         response = api_get("/chat/me")
@@ -234,21 +311,11 @@ def load_llm_status():
         return None
 
 
-def load_chart_data(ticker: str, interval: str = "24", limit: int = 60):
+def load_chart_data(ticker: str, period: str = "day"):
     try:
         response = api_get(
-            f"/charts/candles/{ticker.upper().strip()}?interval={interval}&limit={limit}"
+            f"/charts/candles/{ticker.upper().strip()}?period={period}&market_type=shares"
         )
-        if response.status_code == 200:
-            return response.json()
-        return None
-    except requests.RequestException:
-        return None
-
-
-def load_news_data(query: str):
-    try:
-        response = api_get(f"/news/{query}")
         if response.status_code == 200:
             return response.json()
         return None
@@ -266,13 +333,6 @@ def resolve_instrument(query: str):
         return None
 
 
-# =========================
-# Instrument helpers
-# =========================
-def set_chart_ticker(ticker: str):
-    st.session_state["chart_ticker"] = ticker
-
-
 def apply_resolved_instrument(instrument: dict):
     st.session_state["chart_ticker"] = instrument["ticker"]
     st.session_state["chart_search_query"] = instrument["name"]
@@ -285,9 +345,6 @@ def sync_chart_with_instrument(instrument: dict):
     apply_resolved_instrument(instrument)
 
 
-# =========================
-# Portfolio helpers
-# =========================
 def find_position_by_ticker(portfolio: list[dict], ticker: str) -> dict | None:
     ticker = (ticker or "").upper()
     for item in portfolio:
@@ -302,7 +359,6 @@ def build_position_metrics(position: dict | None, last_price: float | None) -> d
 
     quantity = float(position.get("quantity", 0))
     avg_price = float(position.get("avg_price", 0))
-
     invested_value = quantity * avg_price
 
     if last_price is None:
@@ -331,15 +387,11 @@ def build_position_metrics(position: dict | None, last_price: float | None) -> d
     }
 
 
-# =========================
-# Summary helper
-# =========================
 def build_asset_summary(
-    ticker: str,
-    display_name: str,
-    chart_data: dict | None,
-    news_data: dict | None,
-    position_metrics: dict | None = None
+        ticker: str,
+        display_name: str,
+        chart_data: dict | None,
+        position_metrics: dict | None = None
 ) -> str:
     if not chart_data:
         return "Недостаточно данных для формирования краткого вывода."
@@ -351,35 +403,33 @@ def build_asset_summary(
     support = analysis.get("support")
     resistance = analysis.get("resistance")
     last_price = analysis.get("last_price")
+    candles_count = analysis.get("candles_count")
+    last_candle_time = analysis.get("last_candle_time")
 
-    news_items = []
-    if news_data:
-        news_items = news_data.get("items", []) or []
-
-    parts = [f"По бумаге {display_name} ({ticker})"]
+    parts = [f"По инструменту {display_name} ({ticker})"]
 
     if last_price is not None:
-        parts.append(f"последняя доступная цена составляет {round(last_price, 4)}.")
-
-    if signal == "bullish":
-        parts.append("Техническая картина сейчас скорее позитивная.")
-    elif signal == "bearish":
-        parts.append("Техническая картина сейчас скорее слабая.")
-    else:
-        parts.append("Техническая картина сейчас нейтральная.")
+        parts.append(f"последняя цена составляет {round(last_price, 4)}.")
 
     if trend == "uptrend":
         parts.append("По графику наблюдается восходящее движение.")
     elif trend == "downtrend":
         parts.append("По графику наблюдается нисходящее движение.")
-    elif trend == "sideways":
-        parts.append("Цена движется в боковом диапазоне.")
+    else:
+        parts.append("По графику сейчас скорее боковое движение.")
+
+    if signal == "bullish":
+        parts.append("Сигнал выглядит скорее позитивно.")
+    elif signal == "bearish":
+        parts.append("Сигнал выглядит скорее слабо.")
+    else:
+        parts.append("Сигнал нейтральный.")
 
     if rsi is not None:
         if rsi > 70:
-            parts.append("RSI указывает на зону перекупленности.")
+            parts.append("RSI указывает на перекупленность.")
         elif rsi < 30:
-            parts.append("RSI указывает на зону перепроданности.")
+            parts.append("RSI указывает на перепроданность.")
         else:
             parts.append("RSI находится в нейтральной зоне.")
 
@@ -388,6 +438,11 @@ def build_asset_summary(
             f"Ближайший диапазон выглядит как поддержка {round(support, 4)} и сопротивление {round(resistance, 4)}."
         )
 
+    if candles_count:
+        parts.append(f"Для анализа использовано свечей: {candles_count}.")
+    if last_candle_time:
+        parts.append(f"Последняя свеча начинается в {last_candle_time}.")
+
     if position_metrics:
         pnl = position_metrics.get("absolute_pnl")
         pnl_percent = position_metrics.get("pnl_percent")
@@ -395,121 +450,110 @@ def build_asset_summary(
             pnl_text = f"{round(pnl, 4)}"
             if pnl_percent is not None:
                 pnl_text += f" ({round(pnl_percent, 4)}%)"
-            parts.append(f"По твоей позиции текущий результат составляет {pnl_text}.")
+            parts.append(f"По вашей позиции текущий результат составляет {pnl_text}.")
     else:
-        parts.append("Этой бумаги сейчас нет в твоём портфеле или данные позиции не найдены.")
+        parts.append("Этой бумаги сейчас нет в вашем портфеле или данные позиции не найдены.")
 
-    if news_items:
-        parts.append(f"По инструменту найдено новостей: {len(news_items)}.")
-        first_title = news_items[0].get("title")
-        if first_title:
-            parts.append(f"Последний новостной заголовок: «{first_title}».")
-    else:
-        parts.append("Свежих новостей в текущей выборке не найдено.")
-
-    parts.append("Вывод носит информационный характер и не является инвестиционной рекомендацией.")
-
+    parts.append("Это информационный комментарий, а не инвестиционная рекомендация.")
     return " ".join(parts)
 
 
-# =========================
-# Auth page
-# =========================
 def render_auth():
-    st.title("Broker Assistant")
-    st.subheader("Единый диалоговый ассистент для брокерской сферы")
+    left, center, right = st.columns([2, 3, 2])
 
-    mode = st.radio(
-        "Режим",
-        ["login", "register"],
-        index=0 if st.session_state.auth_mode == "login" else 1,
-        format_func=lambda x: "Вход" if x == "login" else "Регистрация"
-    )
-    st.session_state.auth_mode = mode
+    with center:
+        st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+        st.markdown("## Вход в систему")
 
-    if mode == "register":
-        with st.form("register_form"):
-            login = st.text_input("Логин", value="", placeholder="Например: anna")
-            password = st.text_input("Пароль", type="password", value="", placeholder="Не менее 6 символов")
-            submitted = st.form_submit_button("Зарегистрироваться", use_container_width=True)
+        mode = st.radio(
+            "Режим",
+            ["login", "register"],
+            index=0 if st.session_state.auth_mode == "login" else 1,
+            format_func=lambda x: "Вход" if x == "login" else "Регистрация"
+        )
+        st.session_state.auth_mode = mode
 
-            if submitted:
-                login = login.strip()
+        if mode == "register":
+            with st.form("register_form"):
+                login = st.text_input("Логин", value="", placeholder="Например: anna")
+                password = st.text_input("Пароль", type="password", value="", placeholder="Не менее 6 символов")
+                submitted = st.form_submit_button("Зарегистрироваться", use_container_width=True)
 
-                if not login:
-                    st.warning("Введите логин.")
-                    return
+                if submitted:
+                    login = login.strip()
 
-                if not password:
-                    st.warning("Введите пароль.")
-                    return
+                    if not login:
+                        st.warning("Введите логин.")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        return
 
-                payload = {"login": login, "password": password}
+                    if not password:
+                        st.warning("Введите пароль.")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        return
 
-                try:
-                    response = session.post(
-                        build_url("/auth/register"),
-                        json=payload,
-                        timeout=30
-                    )
+                    payload = {"login": login, "password": password}
 
-                    if response.status_code == 200:
-                        st.success("Регистрация успешна. Теперь войди в систему.")
-                        st.session_state.auth_mode = "login"
-                    else:
-                        show_api_error(response)
+                    try:
+                        response = session.post(
+                            build_url("/auth/register"),
+                            json=payload,
+                            timeout=30
+                        )
 
-                except requests.RequestException as e:
-                    st.error(f"Ошибка соединения: {e}")
+                        if response.status_code == 200:
+                            st.success("Регистрация успешна. Теперь войдите в систему.")
+                            st.session_state.auth_mode = "login"
+                        else:
+                            show_api_error(response)
 
-    else:
-        with st.form("login_form"):
-            login = st.text_input("Логин", value="", placeholder="Твой логин")
-            password = st.text_input("Пароль", type="password", value="", placeholder="Твой пароль")
-            submitted = st.form_submit_button("Войти", use_container_width=True)
+                    except requests.RequestException as e:
+                        st.error(f"Ошибка соединения: {e}")
 
-            if submitted:
-                login = login.strip()
+        else:
+            with st.form("login_form"):
+                login = st.text_input("Логин", value="", placeholder="Ваш логин")
+                password = st.text_input("Пароль", type="password", value="", placeholder="Ваш пароль")
+                submitted = st.form_submit_button("Войти", use_container_width=True)
 
-                if not login:
-                    st.warning("Введите логин.")
-                    return
+                if submitted:
+                    login = login.strip()
 
-                if not password:
-                    st.warning("Введите пароль.")
-                    return
+                    if not login:
+                        st.warning("Введите логин.")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        return
 
-                payload = {"login": login, "password": password}
+                    if not password:
+                        st.warning("Введите пароль.")
+                        st.markdown("</div>", unsafe_allow_html=True)
+                        return
 
-                try:
-                    response = session.post(
-                        build_url("/auth/login"),
-                        json=payload,
-                        timeout=30
-                    )
+                    payload = {"login": login, "password": password}
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        st.session_state.token = data["access_token"]
-                        st.session_state.user = data["user"]
-                        st.success("Вход выполнен")
-                        st.rerun()
-                    else:
-                        show_api_error(response)
+                    try:
+                        response = session.post(
+                            build_url("/auth/login"),
+                            json=payload,
+                            timeout=30
+                        )
 
-                except requests.RequestException as e:
-                    st.error(f"Ошибка соединения: {e}")
+                        if response.status_code == 200:
+                            data = response.json()
+                            st.session_state.token = data["access_token"]
+                            st.session_state.user = data["user"]
+                            st.success("Вход выполнен.")
+                            st.rerun()
+                        else:
+                            show_api_error(response)
 
-    st.divider()
-    st.caption(
-        "Все данные пользователя — портфель, рынок, новости и аналитика — "
-        "используются внутри одного диалога с ассистентом."
-    )
+                    except requests.RequestException as e:
+                        st.error(f"Ошибка соединения: {e}")
+
+        st.caption("Портфель, рынок и аналитика используются внутри одного диалога с ассистентом.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
-# =========================
-# Sidebar
-# =========================
 def render_sidebar():
     with st.sidebar:
         st.title("Broker Assistant")
@@ -520,13 +564,12 @@ def render_sidebar():
 
         st.divider()
 
-        st.markdown("### Быстрые подсказки")
-        st.caption("Попробуй спросить:")
-        st.code("Какая сейчас цена Сбербанка?")
+        st.markdown("### Примеры запросов")
+        st.code("Какая сейчас цена Сбербанка")
         st.code("Сделай теханализ Лукойла")
-        st.code("Объясни новости по Газпрому")
+        st.code("Когда дата отсечки по дивидендам по Татнефти в 2026 году")
+        st.code("Когда следующий купон по облигации RU000A10DFJ2")
         st.code("Проанализируй мой портфель")
-        st.code("Сравни Сбер и Газпром")
 
         st.divider()
 
@@ -534,12 +577,8 @@ def render_sidebar():
             logout()
 
 
-# =========================
-# Right panel
-# =========================
 def render_right_panel():
-    st.markdown('<div class="sticky-side">', unsafe_allow_html=True)
-    st.markdown('<div class="side-card">', unsafe_allow_html=True)
+    st.markdown('<div class="right-panel-card">', unsafe_allow_html=True)
 
     st.markdown("### Сводка")
 
@@ -577,25 +616,21 @@ def render_right_panel():
         st.caption("История пока пуста")
 
     st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# =========================
-# Chat
-# =========================
 def render_dialog_page():
-    st.markdown('<div class="sticky-header">', unsafe_allow_html=True)
-    st.title("Диалог с ассистентом")
-    st.caption("Единая точка входа: ассистент сам использует портфель, рынок, новости и аналитику.")
+    st.markdown('<div class="content-shell">', unsafe_allow_html=True)
+    st.markdown('<div class="page-title"><h3>Диалог с ассистентом</h3></div>', unsafe_allow_html=True)
+    st.caption("Пожалуйста, проверяйте важную информацию, ассистент может ошибаться.")
 
     if st.session_state.last_resolved_instrument:
         instrument = st.session_state.last_resolved_instrument
-        st.info(f"Найден инструмент: {instrument['name']} ({instrument['ticker']})")
-    st.markdown("</div>", unsafe_allow_html=True)
+        st.info(f"Найдена бумага: {instrument['name']} ({instrument['ticker']})")
 
     chat_data = load_chat()
     if not chat_data:
         st.error("Не удалось загрузить чат.")
+        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     messages = chat_data.get("messages", [])
@@ -611,9 +646,9 @@ def render_dialog_page():
             if created_at:
                 st.caption(created_at)
 
-    st.markdown('<div class="chat-bottom-spacer"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="chat-spacer"></div>', unsafe_allow_html=True)
 
-    prompt = st.chat_input("Напиши вопрос ассистенту")
+    prompt = st.chat_input("Напишите вопрос ассистенту")
     if prompt:
         payload = {"content": prompt}
 
@@ -633,105 +668,93 @@ def render_dialog_page():
         except requests.RequestException as e:
             st.error(f"Ошибка соединения: {e}")
 
-
-# =========================
-# Unified analytics screen
-# =========================
-def render_asset_analytics_screen():
-    st.markdown('<div class="sticky-header">', unsafe_allow_html=True)
-    st.markdown("## Аналитический экран по бумаге")
     st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("### Выбор инструмента")
-    quick_col1, quick_col2, quick_col3, quick_col4 = st.columns(4)
 
-    with quick_col1:
-        if st.button("SBER", use_container_width=True, key="asset_quick_sber"):
-            st.session_state["chart_ticker"] = "SBER"
-            st.session_state["chart_search_query"] = "Сбербанк"
-            st.session_state["chart_resolved_name"] = "Сбербанк"
-            st.rerun()
+def render_asset_analytics_screen():
+    st.markdown('<div class="analytics-controls">', unsafe_allow_html=True)
+    st.markdown('<div class="page-title"> Аналитический экран</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="page-caption">Акции. Периоды: час, день, неделя, месяц, год.</div>',
+        unsafe_allow_html=True
+    )
 
-    with quick_col2:
-        if st.button("GAZP", use_container_width=True, key="asset_quick_gazp"):
-            st.session_state["chart_ticker"] = "GAZP"
-            st.session_state["chart_search_query"] = "Газпром"
-            st.session_state["chart_resolved_name"] = "Газпром"
-            st.rerun()
-
-    with quick_col3:
-        if st.button("LKOH", use_container_width=True, key="asset_quick_lkoh"):
-            st.session_state["chart_ticker"] = "LKOH"
-            st.session_state["chart_search_query"] = "Лукойл"
-            st.session_state["chart_resolved_name"] = "Лукойл"
-            st.rerun()
-
-    with quick_col4:
-        if st.button("YDEX", use_container_width=True, key="asset_quick_ydex"):
-            st.session_state["chart_ticker"] = "YDEX"
-            st.session_state["chart_search_query"] = "Яндекс"
-            st.session_state["chart_resolved_name"] = "Яндекс"
-            st.rerun()
-
-    search_col1, search_col2, search_col3 = st.columns([3, 1, 1])
+    search_col1, search_col2 = st.columns([3, 1])
 
     with search_col1:
         search_query = st.text_input(
-            "Название бумаги или тикер",
+            "Название инструмента или тикер",
             value=st.session_state.get("chart_search_query", ""),
-            placeholder="Например: Сбербанк, Газпром, Лукойл, Роснефть",
+            placeholder="Например: Сбербанк, Газпром, Лукойл",
             key="asset_search_query"
         )
 
     with search_col2:
-        interval = st.selectbox(
-            "Интервал",
-            options=["24", "60"],
-            format_func=lambda x: "День" if x == "24" else "Час",
-            key="asset_chart_interval"
-        )
-
-    with search_col3:
-        limit = st.selectbox(
+        period = st.selectbox(
             "Период",
-            options=[30, 60, 90, 120],
-            format_func=lambda x: f"{x} свечей",
-            index=1,
-            key="asset_chart_limit"
+            options=["hour", "day", "week", "month", "year"],
+            index=["hour", "day", "week", "month", "year"].index(st.session_state.get("chart_period", "day")),
+            format_func=lambda x: {
+                "hour": "Час",
+                "day": "День",
+                "week": "Неделя",
+                "month": "Месяц",
+                "year": "Год",
+            }[x],
+            key="asset_chart_period"
         )
 
-    action_col1, action_col2 = st.columns([1, 1])
+    action_col1, action_col2, action_col3 = st.columns([1, 1, 1])
 
     with action_col1:
-        if st.button("Найти инструмент", use_container_width=True, key="asset_find_btn"):
+        if st.button("Найти бумагу", use_container_width=True, key="asset_find_btn"):
             if search_query.strip():
                 instrument = resolve_instrument(search_query.strip())
                 if instrument:
                     apply_resolved_instrument(instrument)
-                    st.success(f"Найден инструмент: {instrument['name']} ({instrument['ticker']})")
+                    st.success(f"Найдена бумага: {instrument['name']} ({instrument['ticker']})")
                     st.rerun()
                 else:
-                    st.warning("Инструмент не найден.")
+                    st.warning("Бумага не найден.")
 
     with action_col2:
         if st.button("Обновить экран", use_container_width=True, key="asset_refresh_btn"):
             st.rerun()
 
+    with action_col3:
+        if st.button("Открыть анализ в чате", use_container_width=True, key="asset_chat_ta_btn"):
+            ticker = st.session_state.get("chart_ticker", "SBER")
+            prompt = f"Сделай технический анализ {ticker} по текущему графику и объясни сигнал простыми словами"
+            response = api_post("/chat/me/messages", json_data={"content": prompt})
+            if response.status_code == 200:
+                data = response.json()
+                resolved_instrument = data.get("resolved_instrument")
+                st.session_state.last_resolved_instrument = resolved_instrument
+                if resolved_instrument:
+                    sync_chart_with_instrument(resolved_instrument)
+                st.session_state.active_page = "dialog"
+                st.rerun()
+            else:
+                show_api_error(response)
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
     ticker = st.session_state.get("chart_ticker", "SBER")
     display_name = st.session_state.get("chart_resolved_name") or ticker
+    period = st.session_state.get("asset_chart_period", st.session_state.get("chart_period", "day"))
 
     chart_data = load_chart_data(
         ticker=ticker,
-        interval=interval,
-        limit=limit
+        period=period
     )
-    news_data = load_news_data(ticker)
     portfolio = load_portfolio()
 
-    st.markdown(f"### Инструмент: **{display_name} ({ticker})**")
+    st.markdown('<div class="chart-shell">', unsafe_allow_html=True)
+    st.markdown(f"### Бумага: **{display_name} ({ticker})**")
 
     if not chart_data:
         st.warning("Не удалось загрузить рыночные данные и теханализ.")
+        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     candles = chart_data.get("candles", []) or []
@@ -739,6 +762,7 @@ def render_asset_analytics_screen():
 
     if not candles:
         st.warning("Свечи не найдены.")
+        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     rows = []
@@ -758,11 +782,11 @@ def render_asset_analytics_screen():
             "high": float(high_value),
             "low": float(low_value),
             "close": float(close_value),
-            "volume": float(candle["value"]) if candle.get("value") is not None else None,
         })
 
     if not rows:
         st.warning("Недостаточно данных для графика.")
+        st.markdown("</div>", unsafe_allow_html=True)
         return
 
     df = pd.DataFrame(rows)
@@ -775,6 +799,7 @@ def render_asset_analytics_screen():
     current_position = find_position_by_ticker(portfolio, ticker)
     position_metrics = build_position_metrics(current_position, last_price)
 
+    st.markdown('<div class="metrics-shell">', unsafe_allow_html=True)
     top_col1, top_col2, top_col3, top_col4 = st.columns(4)
     with top_col1:
         st.metric("Цена", round(last_price, 4) if last_price is not None else "—")
@@ -784,6 +809,7 @@ def render_asset_analytics_screen():
         st.metric("Сигнал", analysis.get("signal") or "—")
     with top_col4:
         st.metric("RSI(14)", round(analysis.get("rsi_14"), 4) if analysis.get("rsi_14") is not None else "—")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     fig = go.Figure()
 
@@ -794,7 +820,7 @@ def render_asset_analytics_screen():
             high=df["high"],
             low=df["low"],
             close=df["close"],
-            name="Candles"
+            name="Свечи"
         )
     )
 
@@ -821,12 +847,14 @@ def render_asset_analytics_screen():
         yaxis_title="Цена",
         xaxis_rangeslider_visible=False,
         height=560,
-        margin=dict(l=20, r=20, t=30, b=20)
+        width=980,
+        margin=dict(l=20, r=20, t=30, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("### 💼 Моя позиция по этой бумаге")
+    st.markdown("### Позиция по бумаге")
     if current_position and position_metrics:
         pos_col1, pos_col2, pos_col3, pos_col4 = st.columns(4)
         with pos_col1:
@@ -851,113 +879,53 @@ def render_asset_analytics_screen():
     else:
         st.caption("Этой бумаги сейчас нет в вашем портфеле.")
 
+    st.markdown('<div class="summary-shell">', unsafe_allow_html=True)
     info_col1, info_col2 = st.columns([2, 1])
 
     with info_col1:
         st.markdown("### Краткий вывод")
-        ai_summary = build_asset_summary(
+        summary = build_asset_summary(
             ticker=ticker,
             display_name=display_name,
             chart_data=chart_data,
-            news_data=news_data,
             position_metrics=position_metrics
         )
-        st.write(ai_summary)
-
-        chat_col1, chat_col2 = st.columns(2)
-
-        with chat_col1:
-            if st.button("Разобрать график в чате", use_container_width=True, key="asset_chat_ta_btn"):
-                prompt = f"Сделай технический анализ {ticker} по текущему графику и объясни сигнал простыми словами"
-                response = api_post("/chat/me/messages", json_data={"content": prompt})
-                if response.status_code == 200:
-                    data = response.json()
-                    resolved_instrument = data.get("resolved_instrument")
-                    st.session_state.last_resolved_instrument = resolved_instrument
-                    if resolved_instrument:
-                        sync_chart_with_instrument(resolved_instrument)
-                    st.success("Запрос отправлен в чат.")
-                    st.rerun()
-                else:
-                    show_api_error(response)
-
-        with chat_col2:
-            if st.button("Объяснить новости в чате", use_container_width=True, key="asset_chat_news_btn"):
-                prompt = f"Объясни новости по {ticker} и их возможное влияние простыми словами"
-                response = api_post("/chat/me/messages", json_data={"content": prompt})
-                if response.status_code == 200:
-                    data = response.json()
-                    resolved_instrument = data.get("resolved_instrument")
-                    st.session_state.last_resolved_instrument = resolved_instrument
-                    if resolved_instrument:
-                        sync_chart_with_instrument(resolved_instrument)
-                    st.success("Запрос отправлен в чат.")
-                    st.rerun()
-                else:
-                    show_api_error(response)
+        st.write(summary)
 
     with info_col2:
         st.markdown("### Технические показатели")
-        st.write(f"**Паттерн:** {analysis.get('pattern') or '—'}")
-        st.write(f"**MACD:** {round(analysis.get('macd'), 4) if analysis.get('macd') is not None else '—'}")
-        st.write(f"**MACD signal:** {round(analysis.get('macd_signal'), 4) if analysis.get('macd_signal') is not None else '—'}")
+        st.write(f"**Свечей в анализе:** {analysis.get('candles_count') or '—'}")
+        st.write(f"**Последняя свеча:** {analysis.get('last_candle_time') or '—'}")
         st.write(f"**Поддержка:** {round(analysis.get('support'), 4) if analysis.get('support') is not None else '—'}")
-        st.write(f"**Сопротивление:** {round(analysis.get('resistance'), 4) if analysis.get('resistance') is not None else '—'}")
-
-    st.markdown("### Новости")
-    if not news_data:
-        st.info("Не удалось загрузить новости.")
-    else:
-        items = news_data.get("items", []) or []
-        if not items:
-            st.caption("Новости пока не найдены.")
-        else:
-            for item in items[:5]:
-                title = item.get("title", "Без заголовка")
-                content = item.get("content", "")
-                published_at = item.get("published_at", "")
-                source_name = item.get("source_name", "")
-
-                with st.container():
-                    st.markdown(f"**{title}**")
-
-                    meta_parts = []
-                    if source_name:
-                        meta_parts.append(source_name)
-                    if published_at:
-                        meta_parts.append(published_at)
-
-                    if meta_parts:
-                        st.caption(" • ".join(meta_parts))
-
-                    if content:
-                        st.write(content)
-
-                    st.divider()
+        st.write(
+            f"**Сопротивление:** {round(analysis.get('resistance'), 4) if analysis.get('resistance') is not None else '—'}")
+        st.write(f"**SMA 5:** {round(analysis.get('sma_5'), 4) if analysis.get('sma_5') is not None else '—'}")
+        st.write(f"**SMA 10:** {round(analysis.get('sma_10'), 4) if analysis.get('sma_10') is not None else '—'}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.caption("Аналитический экран носит информационный характер и не является инвестиционной рекомендацией.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# =========================
-# Main
-# =========================
 def main():
-    inject_sticky_styles()
+    inject_styles()
 
     if not st.session_state.token:
+        render_header()
         render_auth()
         return
 
     if not st.session_state.user:
         if not load_current_user():
+            render_header()
             render_auth()
             return
 
     render_sidebar()
+    render_header()
+    render_top_navigation()
 
-    tab1, tab2 = st.tabs([" Диалог", "Аналитический экран"])
-
-    with tab1:
+    if st.session_state.active_page == "dialog":
         left_col, right_col = st.columns([3, 1])
 
         with left_col:
@@ -965,8 +933,7 @@ def main():
 
         with right_col:
             render_right_panel()
-
-    with tab2:
+    else:
         render_asset_analytics_screen()
 
 

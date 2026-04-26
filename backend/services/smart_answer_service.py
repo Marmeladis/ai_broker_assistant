@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 class SmartAnswerService:
     """
     Детерминированный слой ответов.
@@ -779,3 +782,17 @@ class SmartAnswerService:
             parts.append(f"Текущий совокупный результат портфеля: {data.get('total_pnl_percent')}%.")
         parts.append("Полноценное сравнение с бенчмарком требует отдельного индекса или эталонного портфеля.")
         return " ".join(parts)
+
+        def format_russian_date(date_str: str) -> str:
+            if not date_str:
+                return ""
+
+            dt = datetime.fromisoformat(str(date_str))
+
+            months = [
+                "января", "февраля", "марта", "апреля",
+                "мая", "июня", "июля", "августа",
+                "сентября", "октября", "ноября", "декабря"
+            ]
+
+            return f"{dt.day} {months[dt.month - 1]} {dt.year} года"
