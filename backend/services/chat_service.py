@@ -1,3 +1,7 @@
+import re
+from datetime import date, datetime
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from backend.models import Chat, Message, User
@@ -15,6 +19,63 @@ from backend.services.session_context_service import SessionContextService
 
 
 class ChatService:
+    _RU_MONTHS = {
+        1: "января", 2: "февраля", 3: "марта", 4: "апреля",
+        5: "мая", 6: "июня", 7: "июля", 8: "августа",
+        9: "сентября", 10: "октября", 11: "ноября", 12: "декабря",
+    }
+    _ISO_DATE_RE = re.compile(
+        r"\b(\d{4})-(\d{2})-(\d{2})(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?)?\b"
+    )
+    _TECHNICAL_META_RE = re.compile(
+        r"(?:^|(?<=[.!?])\s+)[^.!?]*(?:"
+        r"Источник|источник|Источник данных|source_name|"
+        r"Объ[её]м|объ[её]м|volume|"
+        r"Время обновления|время обновления|recorded_at|last_update_time"
+        r")[^.!?]*[.!?]?",
+        re.IGNORECASE,
+    )
+
+    @classmethod
+    def _format_date(cls, value: Any) -> str | None:
+        if value is None:
+            return None
+
+        if isinstance(value, datetime):
+            parsed = value.date()
+        elif isinstance(value, date):
+            parsed = value
+        else:
+            text = str(value).strip()
+            if not text:
+                return None
+
+            match = cls._ISO_DATE_RE.search(text)
+            if not match:
+                return text
+
+            year, month, day = map(int, match.groups())
+            try:
+                parsed = date(year, month, day)
+            except ValueError:
+                return text
+
+        return f"{parsed.day} {cls._RU_MONTHS[parsed.month]} {parsed.year} года"
+
+    @classmethod
+    def _clean_user_answer(cls, text: str | None) -> str:
+        if not text:
+            return ""
+
+        cleaned = cls._TECHNICAL_META_RE.sub("", text)
+        cleaned = cls._ISO_DATE_RE.sub(
+            lambda match: cls._format_date(match.group(0)) or match.group(0),
+            cleaned,
+        )
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        cleaned = re.sub(r"\s+([.!?,:;])", r"\1", cleaned)
+        return cleaned.strip()
+
     def __init__(self):
         self.intent_service = IntentService()
         self.context_service = ContextService()
@@ -152,6 +213,8 @@ class ChatService:
                 intent=intent,
                 analytics_result=analytics_result
             )
+
+        assistant_text = self._clean_user_answer(assistant_text)
 
         assistant_message = self.save_message(
             db=db,

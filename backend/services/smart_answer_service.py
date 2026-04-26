@@ -1,6 +1,3 @@
-from datetime import datetime
-
-
 class SmartAnswerService:
     """
     Детерминированный слой ответов.
@@ -101,12 +98,6 @@ class SmartAnswerService:
 
         parts = [f"По инструменту {name} текущая цена составляет {price}."]
 
-        if volume is not None:
-            parts.append(f"Объём в последней записи: {volume}.")
-        if source_name:
-            parts.append(f"Источник: {source_name}.")
-        if recorded_at:
-            parts.append(f"Время обновления: {recorded_at}.")
 
         if position_metrics:
             market_value = position_metrics.get("market_value")
@@ -262,8 +253,6 @@ class SmartAnswerService:
             parts.append(f"Размер дивиденда: {data.get('dividend_per_share')}.")
         if data.get("record_date"):
             parts.append(f"Дата закрытия реестра: {data.get('record_date')}.")
-        if data.get("payment_date"):
-            parts.append(f"Дата выплаты: {data.get('payment_date')}.")
         elif data.get("payment_timing_note"):
             parts.append("Дивиденды обычно поступают в срок до 25 рабочих дней после даты закрытия реестра.")
         if data.get("dividend_yield_percent") is not None:
@@ -369,14 +358,10 @@ class SmartAnswerService:
             parts.append(f"Купить под дивиденды по бумаге {ticker} нужно до {t1_buy_date}.")
             if record_date:
                 parts.append(f"Дата отсечки: {record_date}.")
-            if planned_payment_date:
-                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
             if dividend_per_share is not None:
                 parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
             if status:
                 parts.append(f"Статус: {status}.")
-            if source_name:
-                parts.append(f"Источник: {source_name}.")
             return " ".join(parts)
 
         # 2. Точечный ответ на "когда дата отсечки"
@@ -384,14 +369,10 @@ class SmartAnswerService:
             parts.append(f"Дата отсечки по бумаге {ticker}: {record_date}.")
             if t1_buy_date:
                 parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
-            if planned_payment_date:
-                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
             if dividend_per_share is not None:
                 parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
             if status:
                 parts.append(f"Статус: {status}.")
-            if source_name:
-                parts.append(f"Источник: {source_name}.")
             return " ".join(parts)
 
         # 3. Точечный ответ на "когда выплата"
@@ -405,8 +386,6 @@ class SmartAnswerService:
                 parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
             if status:
                 parts.append(f"Статус: {status}.")
-            if source_name:
-                parts.append(f"Источник: {source_name}.")
             return " ".join(parts)
 
         # 4. Общий ответ про дивиденд
@@ -437,18 +416,12 @@ class SmartAnswerService:
         if t1_buy_date:
             parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
             parts.append("Это последний день покупки на бирже, чтобы попасть в реестр на дивиденды.")
-        if planned_payment_date:
-            parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
         if declared_date:
             parts.append(f"Дата решения: {declared_date}.")
         if status:
             parts.append(f"Статус: {status}.")
-        if price is not None:
-            parts.append(f"Цена бумаги в календаре: {price}.")
         if dividend_yield_percent is not None:
             parts.append(f"Дивидендная доходность: {dividend_yield_percent}%.")
-        if source_name:
-            parts.append(f"Источник: {source_name}.")
         if data.get("is_expected_proxy"):
             parts.append("Это ориентир по доступным данным, а не гарантированное будущее решение по дивидендам.")
 
@@ -493,8 +466,6 @@ class SmartAnswerService:
             parts = [f"Купить под дивиденды по бумаге {ticker} нужно до {t1_buy_date}."]
             if record_date:
                 parts.append(f"Дата отсечки: {record_date}.")
-            if planned_payment_date:
-                parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
             if dividend_per_share is not None:
                 parts.append(f"Дивиденд: {dividend_per_share} {currency or ''}.")
             if status:
@@ -511,13 +482,11 @@ class SmartAnswerService:
         if t1_buy_date:
             parts.append(f"Купить под дивиденды (T+1) нужно до {t1_buy_date}.")
             parts.append("Это последний день покупки на бирже, чтобы попасть в реестр на дивиденды.")
-        if planned_payment_date:
-            parts.append(f"Плановая дата выплаты: {planned_payment_date}.")
         if dividend_per_share is not None:
             parts.append(f"Размер дивиденда в этом контексте: {dividend_per_share} {currency or ''}.")
         if status:
             parts.append(f"Статус: {status}.")
-        parts.append("Поступление дивидендов обычно ожидается в срок до 25 рабочих дней после даты закрытия реестра.")
+
         return " ".join(parts)
 
     def _historical_price_extremes_answer(self, analytics_result: dict | None) -> str | None:
@@ -548,10 +517,6 @@ class SmartAnswerService:
             return "Не удалось найти актуальную цену по этой валюте."
 
         parts = [f"По валютной паре {data.get('display_name')} текущая цена составляет {data.get('price')}."]
-        if data.get("last_update_time"):
-            parts.append(f"Время обновления: {data.get('last_update_time')}.")
-        if data.get("source_name"):
-            parts.append(f"Источник: {data.get('source_name')}.")
         return " ".join(parts)
 
     def _bond_coupon_answer(self, analytics_result: dict | None) -> str | None:
@@ -782,17 +747,3 @@ class SmartAnswerService:
             parts.append(f"Текущий совокупный результат портфеля: {data.get('total_pnl_percent')}%.")
         parts.append("Полноценное сравнение с бенчмарком требует отдельного индекса или эталонного портфеля.")
         return " ".join(parts)
-
-        def format_russian_date(date_str: str) -> str:
-            if not date_str:
-                return ""
-
-            dt = datetime.fromisoformat(str(date_str))
-
-            months = [
-                "января", "февраля", "марта", "апреля",
-                "мая", "июня", "июля", "августа",
-                "сентября", "октября", "ноября", "декабря"
-            ]
-
-            return f"{dt.day} {months[dt.month - 1]} {dt.year} года"
