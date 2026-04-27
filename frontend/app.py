@@ -41,7 +41,6 @@ def inject_styles():
         }
 
 
-        /* Заголовки */
         h1 {
             font-size: 34px;
         }
@@ -58,47 +57,39 @@ def inject_styles():
             font-size: 20px;
         }
 
-        /* Markdown внутри Streamlit */
         .stMarkdown p {
             font-size: 18px;
             line-height: 1.6;
         }
 
-        /* Чат сообщения */
         div[data-testid="stChatMessage"] p {
             font-size: 18px;
         }
 
-        /* Поле ввода */
         textarea, input {
             font-size: 17px !important;
         }
 
-        /* Caption (мелкий текст) */
         .stCaption {
             font-size: 15px;
             color: #6b7280;
         }
 
-        /* Sidebar */
         section[data-testid="stSidebar"] {
             font-size: 16px;
         }
 
-        /* Кнопки */
         .stButton>button {
             font-size: 16px;
             padding: 8px 14px;
         }
 
 
-        /* ===== Убираем "жирный/кривой" markdown Streamlit ===== */
         .stMarkdown h3 {
             font-size: 20px;
             font-weight: 600;
         }
 
-        /* ===== Цвета (убираем красный Streamlit) ===== */
         :root {
             --primary-color: #2563eb; /* синий */
         }
@@ -114,14 +105,12 @@ def inject_styles():
             background-color: #e5e7eb;
         }
 
-        /* primary кнопки → синие */
         .stButton>button[kind="primary"] {
             background-color: #2563eb;
             color: white;
             border: none;
         }
 
-        /* alerts вместо красных */
         .stAlert {
             border-radius: 10px;
         }
@@ -130,7 +119,6 @@ def inject_styles():
             border-left: 4px solid #2563eb !important;
         }
 
-        /* ===== Выравнивание контента ===== */
         .content-shell {
             max-width: 900px;
             margin: 0 auto;
@@ -138,14 +126,12 @@ def inject_styles():
             padding-right: 10px;
         }
 
-        /* ===== Чат ===== */
         div[data-testid="stChatMessage"] {
             max-width: 900px;
             margin-left: auto;
             margin-right: auto;
         }
 
-        /* ===== Поле ввода — ровно по центру ===== */
         div[data-testid="stChatInput"] {
             position: fixed;
             bottom: 0;
@@ -158,7 +144,6 @@ def inject_styles():
             padding: 12px 16px;
         }
 
-        /* ===== Убираем лишнюю жирность caption ===== */
         .stCaption {
             color: #6b7280;
             font-size: 13px;

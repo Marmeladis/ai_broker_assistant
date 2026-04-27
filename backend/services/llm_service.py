@@ -124,8 +124,9 @@ class LLMService:
 9. Если вопрос про дивиденды:
    - назови размер дивиденда,
    - дату отсечки,
-   - ориентир по выплате,
+   - дату покупки под дивиденды, если она есть,
    - дивидендную доходность, если она есть.
+   Не выводи дату выплаты, кроме случая, когда пользователь прямо спрашивает именно про выплату.
 10. Если вопрос про облигации:
    - используй только переданные купоны / ставки / даты.
 11. Если вопрос про рейтинги:
@@ -413,16 +414,76 @@ class LLMService:
 
         if intent == "technical_analysis":
             parts = []
-            if data.get("trend"):
-                parts.append(f"Тренд: {data.get('trend')}.")
-            if data.get("signal"):
-                parts.append(f"Сигнал: {data.get('signal')}.")
-            if data.get("rsi_14") is not None:
-                parts.append(f"RSI(14): {round(data.get('rsi_14'), 4)}.")
-            if data.get("support") is not None:
-                parts.append(f"Поддержка: {round(data.get('support'), 4)}.")
-            if data.get("resistance") is not None:
-                parts.append(f"Сопротивление: {round(data.get('resistance'), 4)}.")
+            bullish = []
+            bearish = []
+            neutral = []
+
+            trend = data.get("trend")
+            signal = data.get("signal")
+            rsi = data.get("rsi_14")
+            macd = data.get("macd")
+            macd_signal = data.get("macd_signal")
+            support = data.get("support")
+            resistance = data.get("resistance")
+            last_price = data.get("last_price")
+
+            if last_price is not None:
+                parts.append(f"Последняя цена: {round(last_price, 4)}.")
+
+            if trend:
+                if trend == "uptrend":
+                    parts.append("Тренд: восходящий — краткосрочно это поддерживает бумагу.")
+                    bullish.append("восходящий тренд")
+                elif trend == "downtrend":
+                    parts.append("Тренд: нисходящий — бумага остаётся под давлением.")
+                    bearish.append("нисходящий тренд")
+                else:
+                    parts.append("Тренд: боковой — выраженного направления сейчас нет.")
+                    neutral.append("боковой тренд")
+
+            if rsi is not None:
+                rsi_value = round(rsi, 4)
+                if rsi > 70:
+                    parts.append(f"RSI(14): {rsi_value} — зона перекупленности, возможна коррекция или пауза.")
+                    bearish.append("перекупленность по RSI")
+                elif rsi < 30:
+                    parts.append(f"RSI(14): {rsi_value} — зона перепроданности, возможен технический отскок.")
+                    bullish.append("перепроданность по RSI")
+                else:
+                    parts.append(f"RSI(14): {rsi_value} — нейтральная зона без сильного самостоятельного сигнала.")
+                    neutral.append("нейтральный RSI")
+
+            if macd is not None:
+                macd_text = f"MACD: {round(macd, 4)}"
+                if macd_signal is not None:
+                    macd_text += f", сигнальная линия: {round(macd_signal, 4)}"
+                    if macd > macd_signal:
+                        parts.append(f"{macd_text}. MACD выше сигнальной линии — импульс скорее бычий.")
+                        bullish.append("MACD выше сигнальной линии")
+                    elif macd < macd_signal:
+                        parts.append(f"{macd_text}. MACD ниже сигнальной линии — импульс скорее медвежий.")
+                        bearish.append("MACD ниже сигнальной линии")
+                else:
+                    parts.append(f"{macd_text}.")
+
+            if support is not None:
+                parts.append(f"Поддержка: {round(support, 4)}.")
+            if resistance is not None:
+                parts.append(f"Сопротивление: {round(resistance, 4)}.")
+            if signal:
+                parts.append(f"Краткосрочный сигнал: {signal}.")
+
+            if bullish or bearish or neutral:
+                summary = []
+                if bullish:
+                    summary.append("бычьи факторы: " + ", ".join(dict.fromkeys(bullish)))
+                if bearish:
+                    summary.append("медвежьи факторы: " + ", ".join(dict.fromkeys(bearish)))
+                if neutral:
+                    summary.append("нейтральные факторы: " + ", ".join(dict.fromkeys(neutral)))
+                parts.append("Совокупно: " + "; ".join(summary) + ".")
+
+            parts.append("Это технический комментарий, а не торговая рекомендация.")
             return " ".join(parts) if parts else "Не удалось выполнить технический анализ."
 
         if intent in {"dividend_info", "historical_dividend_query", "expected_dividend_query", "dividend_record_date_query"}:

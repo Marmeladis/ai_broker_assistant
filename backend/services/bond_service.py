@@ -15,16 +15,9 @@ class BondService:
         self.timeout = settings.MARKET_HTTP_TIMEOUT_SECONDS
 
     def resolve_bond_from_text(self, text: str) -> dict[str, Any] | None:
-        """
-        Очень простой MVP-resolver:
-        - ищет ISIN/RU-код вида RU000...
-        - ищет явный secid в тексте, если пользователь сам его указал
 
-        Позже можно расширить через поиск по MOEX issuer/name.
-        """
         text = (text or "").strip()
 
-        # Поиск ISIN российского формата
         import re
         isin_match = re.search(r"\bRU[0-9A-Z]{10}\b", text.upper())
         if isin_match:
@@ -35,7 +28,6 @@ class BondService:
                 "display_name": code,
             }
 
-        # Очень грубый поиск secid как токена без пробелов
         token_match = re.search(r"\b[A-Z0-9]{6,20}\b", text.upper())
         if token_match and "ОБЛИГ" in text.upper():
             code = token_match.group(0)
@@ -45,10 +37,8 @@ class BondService:
                 "display_name": code,
             }
 
-        # Специальный MVP-хак под Сбербанк
         lowered = text.lower().replace("ё", "е")
         if "сбер" in lowered and "облига" in lowered:
-            # Можно заменить на более конкретную бумагу, если в проекте есть предпочитаемый secid
             return {
                 "bond_code": "RU000A103YM3",
                 "bond_kind": "isin",
@@ -235,7 +225,6 @@ class BondService:
                 "face_value": self._to_float(item.get("FACEVALUE")),
             })
 
-        # сортировка по проценту
         result.sort(
             key=lambda x: x.get("coupon_percent") or 0,
             reverse=True

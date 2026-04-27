@@ -9,20 +9,9 @@ from backend.config import settings
 
 
 class DividendService:
-    """
-    Строгая работа с дивидендами через MOEX ISS.
 
-    Принципы:
-    - не подменять запрошенный год предыдущим годом;
-    - не выдавать старые выплаты за "ожидаемые";
-    - не считать дивдоходность по устаревшим дивидендам;
-    - отсеивать явно нереалистичные yield в рейтингах.
-    """
-
-    # сколько лет назад максимум считаем "свежей" дивидендную запись для рейтингов
     MAX_RANKING_DIVIDEND_AGE_DAYS = 550
 
-    # защитный потолок для дивдоходности в рейтингах, чтобы не было 600%+
     MAX_REASONABLE_DIVIDEND_YIELD_PERCENT = 35.0
 
     def __init__(self):
@@ -86,10 +75,7 @@ class DividendService:
         return items[0]
 
     def get_dividend_by_year(self, ticker: str, year: int) -> dict[str, Any] | None:
-        """
-        Только точное совпадение по году.
-        Никаких "похожих" или "ближайших" годов.
-        """
+
         items = self.get_all_dividends(ticker)
 
         exact_matches = [x for x in items if x.get("year") == year]
@@ -103,22 +89,13 @@ class DividendService:
         return exact_matches[0]
 
     def get_expected_dividend(self, ticker: str, year: int | None = None):
-        # если спрашивают конкретный год → используем календарь
         if year:
-            return None  # теперь логика выше
+            return None
 
         return self.get_last_dividend(ticker)
 
     def get_top_dividend_stocks(self, limit: int = 10) -> list[dict[str, Any]]:
-        """
-        Рейтинг акций по дивидендной доходности, но только по свежим и реалистичным данным.
 
-        Правила:
-        - берём только бумаги с текущей ценой;
-        - берём только последний дивиденд;
-        - дивиденд должен быть достаточно свежим;
-        - yield должен быть > 0 и <= MAX_REASONABLE_DIVIDEND_YIELD_PERCENT.
-        """
         shares = self._get_share_universe(limit_universe=120)
         ranked = []
 
@@ -176,12 +153,7 @@ class DividendService:
         return ranked[:limit]
 
     def get_dividend_aristocrats(self, min_years: int = 3, limit: int = 10) -> list[dict[str, Any]]:
-        """
-        Устойчивые дивидендные компании:
-        - есть выплаты min_years лет подряд;
-        - история должна быть относительно свежей;
-        - текущая yield в разумном диапазоне.
-        """
+
         shares = self._get_share_universe(limit_universe=120)
         result = []
         current_year = datetime.utcnow().year
@@ -202,7 +174,6 @@ class DividendService:
             if not dividends:
                 continue
 
-            # берём только относительно свежую историю по годам
             years = sorted(list({
                 d.get("year")
                 for d in dividends
@@ -262,9 +233,7 @@ class DividendService:
         return result[:limit]
 
     def _get_share_universe(self, limit_universe: int = 120) -> list[dict[str, Any]]:
-        """
-        Universe акций через MOEX shares market с текущей ценой.
-        """
+
         url = f"{self.base_url}/engines/stock/markets/shares/securities.json"
 
         response = requests.get(
@@ -351,15 +320,11 @@ class DividendService:
             ticker: str,
             year: int
     ):
-        """
-        Приоритет:
-        1. Сначала смотрим календарь (БД)
-        2. Если нет — НЕ ВРЁМ, возвращаем None
-        """
 
-        from backend.services.dividend_calendar_service import DividendCalendarService
 
-        calendar_service = DividendCalendarService()
+        from backend.services.dividend_calendar_db_service import DividendCalendarDBService
+
+        calendar_service = DividendCalendarDBService()
 
         item = calendar_service.get_by_ticker(db, ticker, year)
 
@@ -371,7 +336,7 @@ class DividendService:
             "year": item.year,
             "dividend_per_share": item.dividend_per_share,
             "currency": "RUB",
-            "record_date": None,  # честно — у нас только T+1
+            "record_date": None,
             "t1_buy_date": item.t1_buy_date.isoformat(),
             "status": item.status,
             "source_name": item.source_name,

@@ -1,10 +1,4 @@
 class AnalyticsService:
-    """
-    Аналитический слой:
-    - ничего не ищет сам
-    - не ходит во внешние API
-    - работает только с уже собранным context
-    """
 
     def run(self, intent: str, context: dict) -> dict:
         market_context = context.get("market_context") or {}

@@ -244,7 +244,6 @@ class InstrumentService:
         return result
 
     def _pick_best_board(self, boards: list[dict[str, Any]]) -> str | None:
-        #приоритет: TQBR, потом primary, потом первая активная
         if not boards:
             return None
 

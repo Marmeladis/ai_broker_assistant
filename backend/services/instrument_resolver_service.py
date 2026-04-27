@@ -32,13 +32,11 @@ class InstrumentResolverService:
 
         found = []
 
-        #Прямые тикеры
         for token in tokens:
             token_upper = token.upper()
             if token_upper in known_tickers and token_upper not in found:
                 found.append(token_upper)
 
-        #Названия
         aliases = db.query(InstrumentAlias).all()
         alias_pairs = []
         for item in aliases:

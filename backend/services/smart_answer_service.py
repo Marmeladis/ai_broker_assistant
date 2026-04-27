@@ -1,9 +1,5 @@
 class SmartAnswerService:
-    """
-    Детерминированный слой ответов.
-    Если можем уверенно ответить по готовым данным — отвечаем без LLM.
-    Если нет — возвращаем None, и дальше отвечает LLM.
-    """
+
 
     def build_answer(
         self,
@@ -119,33 +115,144 @@ class SmartAnswerService:
         if not data:
             return "Недостаточно данных для технического анализа."
 
+        last_price = data.get("last_price")
+        trend = data.get("trend")
+        signal = data.get("signal")
+        signal_strength = data.get("signal_strength")
+        rsi = data.get("rsi_14")
+        sma_5 = data.get("sma_5")
+        sma_10 = data.get("sma_10")
+        support = data.get("support")
+        resistance = data.get("resistance")
+        support_distance = data.get("support_distance_percent")
+        resistance_distance = data.get("resistance_distance_percent")
+        macd = data.get("macd")
+        macd_signal = data.get("macd_signal")
+        macd_histogram = data.get("macd_histogram")
+        pattern = data.get("pattern")
+
         parts = []
+        bullish_factors = []
+        bearish_factors = []
+        neutral_factors = []
 
-        if data.get("last_price") is not None:
-            parts.append(f"Последняя цена: {data.get('last_price')}.")
-        if data.get("trend"):
-            parts.append(f"Текущий тренд: {data.get('trend')}.")
-        if data.get("signal"):
-            parts.append(f"Сигнал: {data.get('signal')}.")
-        if data.get("rsi_14") is not None:
-            rsi = round(data.get("rsi_14"), 4)
-            parts.append(f"RSI(14): {rsi}.")
+        if last_price is not None:
+            parts.append(f"Последняя цена: {round(last_price, 4)}.")
+
+        if trend:
+            if trend == "uptrend":
+                parts.append("Тренд: восходящий — цена держится выше коротких скользящих, что поддерживает сценарий продолжения роста.")
+                bullish_factors.append("восходящий тренд")
+            elif trend == "downtrend":
+                parts.append("Тренд: нисходящий — цена находится под давлением, поэтому риск дальнейшего снижения выше.")
+                bearish_factors.append("нисходящий тренд")
+            else:
+                parts.append("Тренд: боковой — выраженного направления сейчас нет, рынок скорее находится в фазе неопределённости.")
+                neutral_factors.append("боковой тренд")
+
+        if sma_5 is not None or sma_10 is not None:
+            sma_text = []
+            if sma_5 is not None:
+                sma_text.append(f"SMA5: {round(sma_5, 4)}")
+            if sma_10 is not None:
+                sma_text.append(f"SMA10: {round(sma_10, 4)}")
+
+            if last_price is not None and sma_5 is not None and sma_10 is not None:
+                if last_price > sma_5 > sma_10:
+                    interpretation = "цена выше SMA5 и SMA10 — краткосрочная структура выглядит бычьей."
+                    bullish_factors.append("цена выше скользящих")
+                elif last_price < sma_5 < sma_10:
+                    interpretation = "цена ниже SMA5 и SMA10 — краткосрочная структура выглядит медвежьей."
+                    bearish_factors.append("цена ниже скользящих")
+                else:
+                    interpretation = "цена относительно скользящих даёт смешанный сигнал, явного преимущества у покупателей или продавцов нет."
+                    neutral_factors.append("смешанный сигнал по скользящим")
+                parts.append(f"Скользящие средние: {', '.join(sma_text)}; {interpretation}")
+            else:
+                parts.append(f"Скользящие средние: {', '.join(sma_text)}.")
+
+        if rsi is not None:
+            rsi_value = round(rsi, 4)
             if rsi > 70:
-                parts.append("Индикатор находится в зоне перекупленности.")
+                parts.append(f"RSI(14): {rsi_value} — зона перекупленности. Рост уже может быть перегрет, поэтому повышается вероятность коррекции или паузы.")
+                bearish_factors.append("RSI в зоне перекупленности")
             elif rsi < 30:
-                parts.append("Индикатор находится в зоне перепроданности.")
-        if data.get("support") is not None:
-            parts.append(f"Поддержка: {round(data.get('support'), 4)}.")
-        if data.get("resistance") is not None:
-            parts.append(f"Сопротивление: {round(data.get('resistance'), 4)}.")
-        if data.get("pattern"):
-            parts.append(f"Паттерн: {data.get('pattern')}.")
-        if data.get("macd") is not None:
-            parts.append(f"MACD: {round(data.get('macd'), 4)}.")
-        if data.get("macd_signal") is not None:
-            parts.append(f"Сигнальная линия MACD: {round(data.get('macd_signal'), 4)}.")
+                parts.append(f"RSI(14): {rsi_value} — зона перепроданности. Бумага выглядит локально перепроданной, возможен технический отскок.")
+                bullish_factors.append("RSI в зоне перепроданности")
+            elif 45 <= rsi <= 60:
+                parts.append(f"RSI(14): {rsi_value} — нейтральная зона с умеренным преимуществом покупателей, без признаков перегрева.")
+                neutral_factors.append("RSI без перегрева")
+            else:
+                parts.append(f"RSI(14): {rsi_value} — нейтральная зона, индикатор не даёт сильного самостоятельного сигнала.")
+                neutral_factors.append("нейтральный RSI")
 
-        parts.append("Технический комментарий носит информационный характер.")
+        if macd is not None:
+            macd_text = f"MACD: {round(macd, 4)}"
+            if macd_signal is not None:
+                macd_text += f", сигнальная линия: {round(macd_signal, 4)}"
+            if macd_histogram is not None:
+                macd_text += f", гистограмма: {round(macd_histogram, 4)}"
+            if macd_signal is not None:
+                if macd > macd_signal:
+                    parts.append(f"{macd_text}. MACD выше сигнальной линии — импульс скорее бычий, покупатели активнее продавцов.")
+                    bullish_factors.append("MACD выше сигнальной линии")
+                elif macd < macd_signal:
+                    parts.append(f"{macd_text}. MACD ниже сигнальной линии — импульс скорее медвежий, давление продавцов сохраняется.")
+                    bearish_factors.append("MACD ниже сигнальной линии")
+                else:
+                    parts.append(f"{macd_text}. MACD около сигнальной линии — импульс нейтральный.")
+                    neutral_factors.append("MACD без явного импульса")
+            else:
+                parts.append(f"{macd_text}.")
+
+        if support is not None:
+            if support_distance is not None:
+                parts.append(f"Поддержка: {round(support, 4)} — до неё примерно {round(abs(support_distance), 2)}% от текущей цены.")
+            else:
+                parts.append(f"Поддержка: {round(support, 4)}.")
+
+        if resistance is not None:
+            if resistance_distance is not None:
+                parts.append(f"Сопротивление: {round(resistance, 4)} — до него примерно {round(abs(resistance_distance), 2)}% от текущей цены.")
+            else:
+                parts.append(f"Сопротивление: {round(resistance, 4)}.")
+
+        if pattern:
+            parts.append(f"Паттерн: {pattern}.")
+
+        if signal:
+            if signal == "bullish":
+                parts.append("Краткосрочный сигнал: бычий.")
+                bullish_factors.append("итоговый сигнал бычий")
+            elif signal == "bearish":
+                parts.append("Краткосрочный сигнал: медвежий.")
+                bearish_factors.append("итоговый сигнал медвежий")
+            else:
+                parts.append("Краткосрочный сигнал: нейтральный.")
+                neutral_factors.append("итоговый сигнал нейтральный")
+
+        if bullish_factors or bearish_factors or neutral_factors:
+            summary_parts = []
+            if bullish_factors:
+                summary_parts.append("бычьи факторы: " + ", ".join(dict.fromkeys(bullish_factors)))
+            if bearish_factors:
+                summary_parts.append("медвежьи факторы: " + ", ".join(dict.fromkeys(bearish_factors)))
+            if neutral_factors:
+                summary_parts.append("нейтральные факторы: " + ", ".join(dict.fromkeys(neutral_factors)))
+            parts.append("Совокупно: " + "; ".join(summary_parts) + ".")
+
+        if signal_strength:
+            strength_text = {
+                "strong_bullish": "сильное преимущество покупателей",
+                "moderate_bullish": "умеренное преимущество покупателей",
+                "strong_bearish": "сильное преимущество продавцов",
+                "moderate_bearish": "умеренное преимущество продавцов",
+                "mixed": "смешанная картина без сильного перевеса",
+            }.get(signal_strength, "смешанная картина без сильного перевеса")
+            parts.append(f"Итог: {strength_text}. Это не торговая рекомендация, а технический комментарий по текущим данным.")
+        else:
+            parts.append("Итог: сигналы нужно оценивать вместе с новостями, ликвидностью и общим рынком. Это не торговая рекомендация.")
+
         return " ".join(parts)
 
     def _buy_or_wait_answer(self, analytics_result: dict | None) -> str | None:
@@ -257,8 +364,6 @@ class SmartAnswerService:
             parts.append("Дивиденды обычно поступают в срок до 25 рабочих дней после даты закрытия реестра.")
         if data.get("dividend_yield_percent") is not None:
             parts.append(f"Оценочная дивидендная доходность: {data.get('dividend_yield_percent')}%.")
-        if data.get("source_name"):
-            parts.append(f"Источник данных: {data.get('source_name')}.")
 
         return " ".join(parts)
 
@@ -353,7 +458,6 @@ class SmartAnswerService:
 
         parts = []
 
-        # 1. Точечный ответ на "до какой даты купить"
         if asks_buy_date and t1_buy_date:
             parts.append(f"Купить под дивиденды по бумаге {ticker} нужно до {t1_buy_date}.")
             if record_date:
@@ -364,7 +468,6 @@ class SmartAnswerService:
                 parts.append(f"Статус: {status}.")
             return " ".join(parts)
 
-        # 2. Точечный ответ на "когда дата отсечки"
         if asks_record_date and record_date:
             parts.append(f"Дата отсечки по бумаге {ticker}: {record_date}.")
             if t1_buy_date:
@@ -375,7 +478,6 @@ class SmartAnswerService:
                 parts.append(f"Статус: {status}.")
             return " ".join(parts)
 
-        # 3. Точечный ответ на "когда выплата"
         if asks_payment_date and planned_payment_date:
             parts.append(f"Плановая дата выплаты по бумаге {ticker}: {planned_payment_date}.")
             if record_date:
@@ -388,7 +490,6 @@ class SmartAnswerService:
                 parts.append(f"Статус: {status}.")
             return " ".join(parts)
 
-        # 4. Общий ответ про дивиденд
         if requested_year:
             if status == "Подтверждено":
                 parts.append(

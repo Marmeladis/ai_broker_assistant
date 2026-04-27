@@ -142,7 +142,6 @@ class ChatService:
             if session_enrichment.get("used_session_context") and session_instrument:
                 resolved_instrument = session_instrument
 
-        # ВАЖНО: здесь нужен именно список тикеров
         resolved_tickers = self.context_service.market_service.extract_tickers_from_text(
             db=db,
             text=normalized_text,

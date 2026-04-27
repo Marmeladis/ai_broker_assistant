@@ -47,13 +47,11 @@ class DividendCalendarDBService:
     ):
         text = (user_text or "").lower()
 
-        # 1. По тикеру
         if ticker:
             item = self.get_by_ticker(db, ticker, year)
             if item:
                 return item
 
-        # 2. Alias (быстрое сопоставление)
         alias_map = {
             "татнефть": ["TATN", "TATNP"],
             "татнефти": ["TATN", "TATNP"],
@@ -76,7 +74,6 @@ class DividendCalendarDBService:
                     if item:
                         return item
 
-        # 3. По display_name
         if display_name:
             item = (
                 db.query(DividendCalendarItem)
@@ -87,7 +84,6 @@ class DividendCalendarDBService:
             if item:
                 return item
 
-        # 🔥 4. ГЛАВНЫЙ ФИКС — поиск по ВСЕЙ таблице
         all_items = db.query(DividendCalendarItem).all()
 
         normalized_text = self._normalize_name(text)
@@ -95,15 +91,12 @@ class DividendCalendarDBService:
         for item in all_items:
             name = self._normalize_name(item.security_name)
 
-            # прямое вхождение
             if name and name in normalized_text:
                 return item
 
-            # или наоборот
             if normalized_text and normalized_text in name:
                 return item
 
-        # 🔹 5. По словам
         tokens = normalized_text.split()
 
         for token in tokens:

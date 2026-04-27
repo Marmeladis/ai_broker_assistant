@@ -8,18 +8,6 @@ from backend.config import settings
 
 
 class FXService:
-    """
-    Валюты через MOEX.
-
-    Логика:
-    1. Пытаемся взять "живую" цену через обычный ISS endpoint security marketdata.
-    2. Если для USD/EUR там приходит 0.0 или None, используем статистический rates endpoint.
-    3. Для CNY spot-цена обычно доступна напрямую, поэтому сначала всегда пробуем ISS marketdata.
-
-    Важно:
-    - Для USD/EUR в текущей конфигурации биржи/ISS spot-поля могут приходить нулевыми.
-    - Поэтому нужен fallback на rates endpoint.
-    """
 
     FX_MAP = {
         "USD": {
@@ -66,17 +54,14 @@ class FXService:
         if not item:
             return None
 
-        # 1. Сначала пробуем "живой" marketdata endpoint
         live_quote = self._get_live_fx_quote(item)
         if live_quote and live_quote.get("price") is not None and live_quote.get("price") > 0:
             return live_quote
 
-        # 2. Если USD/EUR дали 0.0 или пусто, идём в rates fallback
         rates_quote = self._get_rates_fallback(currency_code, item)
         if rates_quote and rates_quote.get("price") is not None and rates_quote.get("price") > 0:
             return rates_quote
 
-        # 3. Возвращаем live_quote даже если там 0.0, чтобы было видно проблему
         return live_quote or rates_quote
 
     def _get_live_fx_quote(self, item: dict[str, Any]) -> dict[str, Any] | None:
@@ -150,7 +135,6 @@ class FXService:
 
         payload = response.json()
 
-        # Обычно нужные поля лежат в секции cbrf
         cbrf = payload.get("cbrf", {})
         columns = cbrf.get("columns", [])
         rows = cbrf.get("data", [])
@@ -194,9 +178,7 @@ class FXService:
         return " ".join(parts)
 
     def _extract_best_live_price(self, marketdata_item: dict[str, Any]) -> float | None:
-        """
-        Для spot-данных берём первое ненулевое значение.
-        """
+
         candidates = [
             self._to_float(marketdata_item.get("LAST")),
             self._to_float(marketdata_item.get("MARKETPRICE")),

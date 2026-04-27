@@ -8,14 +8,7 @@ from backend.services.market_service import MarketService
 
 
 class QueryPreprocessorService:
-    """
-    Предобработка пользовательского запроса.
 
-    Цели:
-    1. Нормализовать текст.
-    2. Попробовать распознать инструмент локально и безопасно.
-    3. Не ронять чат, если внешний MOEX-поиск временно недоступен.
-    """
 
     def __init__(self):
         self.instrument_service = InstrumentService()
@@ -46,22 +39,15 @@ class QueryPreprocessorService:
         db: Session,
         text: str
     ) -> dict | None:
-        """
-        Порядок:
-        1. Сначала пробуем локально через текущую БД/резолвер market_service.
-        2. Если не нашли — пробуем resolve_or_create_instrument.
-        3. Любые сетевые ошибки MOEX гасим и возвращаем None, а не 500.
-        """
+
         if not text:
             return None
 
-        # 1. Локальное/мягкое распознавание
         try:
             local = self.market_service.instrument_resolver.resolve_instrument_from_text(db, text)
             if local:
                 return self._normalize_resolved_instrument(local)
         except AttributeError:
-            # Если у instrument_resolver нет такого метода, пробуем тикер+display name
             try:
                 ticker = self.market_service.extract_ticker_from_text(db, text)
                 if ticker:
@@ -75,7 +61,6 @@ class QueryPreprocessorService:
         except Exception:
             pass
 
-        # 2. Попытка через instrument_service, но безопасно
         try:
             instrument = self.instrument_service.resolve_or_create_instrument(db, text)
             if instrument:
@@ -92,9 +77,7 @@ class QueryPreprocessorService:
         return None
 
     def _normalize_resolved_instrument(self, instrument) -> dict:
-        """
-        Приводим разные варианты результата к единому формату dict.
-        """
+
         if isinstance(instrument, dict):
             ticker = instrument.get("ticker")
             name = instrument.get("name") or instrument.get("display_name")

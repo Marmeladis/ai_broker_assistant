@@ -238,31 +238,22 @@ class DividendCalendarItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    # Техническое поле, чтобы удобно искать по бумаге
     ticker = Column(String, nullable=False, index=True)
 
-    # Ценная бумага
     security_name = Column(String, nullable=False, index=True)
 
-    # Дата покупки под дивиденды (T+1)
     t1_buy_date = Column(Date, nullable=False, index=True)
 
-    # Дата отсечки = T+1 + 1 день
     record_date = Column(Date, nullable=False, index=True)
 
-    # Плановая дата выплаты
     planned_payment_date = Column(Date, nullable=True, index=True)
 
-    # Статус
     status = Column(String, nullable=True, index=True)
 
-    # Дивиденды в рублях
     dividend_rub = Column(Float, nullable=True)
 
-    # Цена бумаги
     share_price = Column(Float, nullable=True)
 
-    # Дивидендная доходность %
     dividend_yield_percent = Column(Float, nullable=True)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)

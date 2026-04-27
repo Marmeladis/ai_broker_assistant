@@ -33,7 +33,6 @@ class NewsProviderService:
             try:
                 feed = feedparser.parse(rss_url)
                 if getattr(feed, "bozo", 0):
-                    # иногда RSS парсится с bozo=1, но entries всё равно доступны
                     pass
 
                 entries = getattr(feed, "entries", [])[: self.max_items_per_source]
@@ -86,7 +85,6 @@ class NewsProviderService:
             if alias:
                 result.append(alias)
 
-        # полезные дополнительные формы
         normalized_extra = []
         for item in result:
             normalized_extra.append(item)

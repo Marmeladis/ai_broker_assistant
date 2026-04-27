@@ -13,7 +13,6 @@ class IntentService:
         if self._looks_like_fx_price_query(text_lower):
             return "fx_price_query"
 
-        # Календарные дивидендные запросы 2026
         if self._looks_like_dividend_calendar_query(text_lower):
             return "expected_dividend_query"
 
@@ -199,13 +198,7 @@ class IntentService:
         return "general_question"
 
     def _looks_like_dividend_calendar_query(self, text: str) -> bool:
-        """
-        Календарные запросы про дивиденды 2026:
-        - ожидаемый дивиденд
-        - дата отсечки
-        - до какой даты купить под дивиденды
-        - просто "дивиденды по <бумаге> 2026"
-        """
+
         has_year_2026 = "2026" in text
 
         has_dividend_word = any(marker in text for marker in [

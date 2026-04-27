@@ -64,7 +64,6 @@ class PriceHistoryService:
 
     def _estimate_days_back(self, interval: str, limit: int) -> int:
         if interval == "24":
-            # запас по дням
             return max(limit * 3, 90)
 
         if interval == "60":
